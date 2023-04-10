@@ -6,9 +6,11 @@ add_library(carla MODULE)
 add_library(OBS::carla ALIAS carla)
 
 target_compile_definitions(carla PRIVATE
+  CARLA_BACKEND_NAMESPACE=CarlaOBS
   CARLA_LIB_EXT=".so"
   CARLA_PLUGIN_BUILD
   REAL_BUILD
+  STATIC_PLUGIN_TARGET
 )
 
 target_compile_options(carla PRIVATE
@@ -24,9 +26,9 @@ target_include_directories(carla PRIVATE
   carla/source/utils
 )
 
-target_link_options(carla PRIVATE
-  -Wl,--no-undefined
-)
+#target_link_options(carla PRIVATE
+#  -Wl,--no-undefined
+#)
 
 ###############################################################################
 # lilv
@@ -171,7 +173,7 @@ target_sources(carla_ysfx PRIVATE
 ###############################################################################
 
 target_sources(carla PRIVATE
-  carla.cpp
+  carla.c
   carla/source/backend/engine/CarlaEngine.cpp
   carla/source/backend/engine/CarlaEngineClient.cpp
   carla/source/backend/engine/CarlaEngineData.cpp
