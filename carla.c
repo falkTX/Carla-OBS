@@ -39,6 +39,9 @@ static intptr_t host_dispatcher(NativeHostHandle handle, NativeHostDispatcherOpc
 // carla + obs integration methods
 
 struct carla_data {
+    obs_source_t *source;
+
+    // carla host
     const NativePluginDescriptor* descriptor;
     NativePluginHandle handle;
     NativeHostDescriptor host;
@@ -92,7 +95,7 @@ void carla_obs_idle_callback(void *data, float unused)
     carla->descriptor->ui_idle(carla->handle);
 }
 
-static void *carla_obs_create(obs_data_t *settings, obs_source_t *filter)
+static void *carla_obs_create(obs_data_t *settings, obs_source_t *source)
 {
     TRACE_CALL
     const NativePluginDescriptor* descriptor = carla_get_native_rack_plugin();
@@ -102,6 +105,8 @@ static void *carla_obs_create(obs_data_t *settings, obs_source_t *filter)
     struct carla_data *carla = carla_obs_alloc();
     if (carla == NULL)
         return NULL;
+
+    carla->source = source;
 
     carla->bufferPos = 0;
     carla->bufferSize = MAX_AUDIO_BUFFER_SIZE;
@@ -156,39 +161,9 @@ static void *carla_obs_create(obs_data_t *settings, obs_source_t *filter)
     descriptor->activate(carla->handle);
 
     // TESTING
-    carla_add_plugin(carla->internalHostHandle, BINARY_NATIVE, PLUGIN_LV2, NULL, NULL, "http://aidadsp.cc/plugins/aidadsp-bundle/rt-neural-loader", 0, NULL, PLUGIN_OPTIONS_NULL);
+    carla_add_plugin(carla->internalHostHandle, BINARY_NATIVE, PLUGIN_LV2, NULL, NULL, "https://github.com/trummerschlunk/master_me", 0, NULL, PLUGIN_OPTIONS_NULL);
 
     obs_add_tick_callback(carla_obs_idle_callback, carla);
-
-    const uint32_t params = carla->descriptor->get_parameter_count(carla->handle);
-    char pname[] = {'C','a','r','l','a','.','p','0','0','0','\0'};
-
-    for (uint32_t i=0; i < params; ++i)
-    {
-        const NativeParameter *const info = carla->descriptor->get_parameter_info(carla->handle, i);
-
-        if ((info->hints & NATIVE_PARAMETER_IS_ENABLED) == 0)
-            continue;
-
-        pname[7] = '0' + ((i / 100) % 10);
-        pname[8] = '0' + ((i / 10) % 10);
-        pname[9] = '0' + (i % 10);
-
-        const char *const mname = obs_module_text(pname);
-
-        if (info->hints & NATIVE_PARAMETER_IS_BOOLEAN)
-        {
-            obs_data_set_default_bool(settings, mname, info->ranges.def == info->ranges.max);
-        }
-        else if (info->hints & PARAMETER_IS_INTEGER)
-        {
-            obs_data_set_default_int(settings, mname, info->ranges.def);
-        }
-        else
-        {
-            obs_data_set_default_double(settings, mname, info->ranges.def);
-        }
-    }
 
     return carla;
 
@@ -252,11 +227,6 @@ static struct obs_audio_data *carla_obs_filter_audio(void *data, struct obs_audi
     return audio;
 }
 
-static void carla_obs_get_defaults(obs_data_t *defaults)
-{
-    TRACE_CALL
-}
-
 static bool open_editor_button_clicked(obs_properties_t *props, obs_property_t *property, void *data)
 {
     TRACE_CALL
@@ -283,7 +253,7 @@ static bool carla_obs_param_changed(void *data, obs_properties_t *props, obs_pro
     if (pname == NULL)
         return false;
 
-    const char* pname2 = pname + 7;
+    const char* pname2 = pname + 1;
     while (*pname2 == '0')
         ++pname2;
 
@@ -304,6 +274,7 @@ static bool carla_obs_param_changed(void *data, obs_properties_t *props, obs_pro
     }
 
     const int pindex = atoi(pname2);
+
     printf("param changed %d:%s %f\n", pindex, pname, value);
     carla->descriptor->set_parameter_value(carla->handle, pindex, value);
 
@@ -321,8 +292,10 @@ static obs_properties_t *carla_obs_get_properties(void *data)
     obs_properties_add_button(props, "show-gui", obs_module_text("Show custom GUI"), open_editor_button_clicked);
     // obs_properties_add_button(props, "settings", obs_module_text("Settings"), open_editor_button_clicked);
 
+    obs_data_t *settings = obs_source_get_settings(carla->source);
+
     const uint32_t params = carla->descriptor->get_parameter_count(carla->handle);
-    char pname[] = {'C','a','r','l','a','.','p','0','0','0','\0'};
+    char pname[] = {'p','0','0','0','\0'};
 
     for (uint32_t i=0; i < params; ++i)
     {
@@ -331,27 +304,34 @@ static obs_properties_t *carla_obs_get_properties(void *data)
         if ((info->hints & NATIVE_PARAMETER_IS_ENABLED) == 0)
             continue;
 
-        pname[7] = '0' + ((i / 100) % 10);
-        pname[8] = '0' + ((i / 10) % 10);
-        pname[9] = '0' + (i % 10);
-
-        const char *const mname = obs_module_text(pname);
+        pname[1] = '0' + ((i / 100) % 10);
+        pname[2] = '0' + ((i / 10) % 10);
+        pname[3] = '0' + (i % 10);
+        printf("adding slider '%s'\n", pname);
 
         obs_property_t *prop;
 
         if (info->hints & NATIVE_PARAMETER_IS_BOOLEAN)
         {
-            prop = obs_properties_add_bool(props, mname, info->name);
+            prop = obs_properties_add_bool(props, pname, info->name);
+
+            obs_data_set_default_bool(settings, pname, info->ranges.def == info->ranges.max);
         }
         else if (info->hints & PARAMETER_IS_INTEGER)
         {
-            prop = obs_properties_add_int_slider(props, mname, info->name, info->ranges.min, info->ranges.max, 1);
+            prop = obs_properties_add_int_slider(props, pname, info->name, info->ranges.min, info->ranges.max, 1);
+
+            obs_data_set_default_int(settings, pname, info->ranges.def);
+
             if (info->unit && *info->unit)
                 obs_property_int_set_suffix(prop, info->unit);
         }
         else
         {
-            prop = obs_properties_add_float_slider(props, mname, info->name, info->ranges.min, info->ranges.max, 0.1);
+            prop = obs_properties_add_float_slider(props, pname, info->name, info->ranges.min, info->ranges.max, 0.1);
+
+            obs_data_set_default_double(settings, pname, info->ranges.def);
+
             if (info->unit && *info->unit)
                 obs_property_float_set_suffix(prop, info->unit);
         }
@@ -382,8 +362,9 @@ static double host_get_sample_rate(const NativeHostHandle handle)
     return carla->sampleRate;
 }
 
-static bool host_is_offline(NativeHostHandle)
+static bool host_is_offline(const NativeHostHandle handle)
 {
+    UNUSED_PARAMETER(handle);
     return false;
 }
 
@@ -404,28 +385,61 @@ static void host_ui_parameter_changed(NativeHostHandle handle, const uint32_t in
 {
     struct carla_data *carla = handle;
 
-    char pname[5] = {
-        'p',
-        '1' + (index % 10),
-        '0' + ((index / 10) % 10),
-        '0' + ((index / 100) % 10),
-        '\0'
-    };
+    char pname[] = {'p','0','0','0','\0'};
+    pname[1] = '0' + ((index / 100) % 10);
+    pname[2] = '0' + ((index / 10) % 10);
+    pname[3] = '0' + (index % 10);
+    printf("changing slider %d:%s to %f - START\n", index, pname, value);
 
-//     obs_data_t *settings = obs_data_create();
-//     obs_data_set_double(settings, pname, value);
-//
-//     obs_property_modified(obs_properties_get(carla->properties, pname), settings);
-//
-//     obs_data_release(settings);
+    // FIXME this doesnt really work
+
+    obs_source_t *source = carla->source;
+    obs_properties_t *properties = obs_source_properties(source);
+    obs_property_t *property = obs_properties_get(properties, pname);
+
+    if (property == NULL)
+        goto end2;
+
+    obs_data_t *settings = obs_source_get_settings(source);
+    switch (obs_property_get_type(property))
+    {
+    case OBS_PROPERTY_BOOL:
+        obs_data_set_bool(settings, pname, value > 0.5f ? 1.f : 0.f);
+        break;
+    case OBS_PROPERTY_INT:
+        obs_data_set_int(settings, pname, value);
+        break;
+    case OBS_PROPERTY_FLOAT:
+        obs_data_set_double(settings, pname, value);
+        break;
+    default:
+        goto end;
+    }
+
+    obs_source_update(source, settings);
+
+    printf("changing slider %d:%s to %f - DONE\n", index, pname, value);
+
+end:
+    obs_data_release(settings);
+
+end2:
+    obs_properties_destroy(properties);
 }
 
 static void host_ui_midi_program_changed(NativeHostHandle handle, uint8_t channel, uint32_t bank, uint32_t program)
 {
+    UNUSED_PARAMETER(handle);
+    UNUSED_PARAMETER(channel);
+    UNUSED_PARAMETER(bank);
+    UNUSED_PARAMETER(program);
 }
 
 static void host_ui_custom_data_changed(NativeHostHandle handle, const char* key, const char* value)
 {
+    UNUSED_PARAMETER(handle);
+    UNUSED_PARAMETER(key);
+    UNUSED_PARAMETER(value);
 }
 
 static void host_ui_closed(NativeHostHandle handle)
