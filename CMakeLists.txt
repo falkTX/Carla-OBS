@@ -9,6 +9,7 @@ target_compile_definitions(carla PRIVATE
   CARLA_BACKEND_NAMESPACE=CarlaOBS
   CARLA_LIB_EXT=".so"
   CARLA_PLUGIN_BUILD
+  HAVE_X11
   REAL_BUILD
   STATIC_PLUGIN_TARGET
 )
@@ -174,6 +175,7 @@ target_sources(carla_ysfx PRIVATE
 
 target_sources(carla PRIVATE
   carla.c
+  qtutils.cpp
   carla/source/backend/engine/CarlaEngine.cpp
   carla/source/backend/engine/CarlaEngineClient.cpp
   carla/source/backend/engine/CarlaEngineData.cpp
