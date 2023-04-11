@@ -32,11 +32,18 @@ uintptr_t carla_obs_get_main_window_id(void)
             return mw->winId();
     }
 
+    return 0;
+}
+
+void* carla_obs_get_main_window_qt_widget_ptr(void)
+{
+    const QWidgetList &wl = QApplication::topLevelWidgets();
+
     for (QWidget *w : wl)
     {
-        if (!w->parent())
-            return w->winId();
+        if (QMainWindow *mw = qobject_cast<QMainWindow*>(w))
+            return w;
     }
 
-    return wl[0]->winId();
+    return nullptr;
 }
