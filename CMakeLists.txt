@@ -1,6 +1,6 @@
 project(carla)
 
-find_qt(COMPONENTS Core Widgets)
+find_qt(COMPONENTS Core Gui Widgets)
 find_package(X11)
 
 add_library(carla MODULE)
@@ -252,6 +252,7 @@ target_link_libraries(carla PRIVATE
   OBS::libobs
   OBS::frontend-api
   Qt::Core
+  Qt::Gui
   Qt::Widgets
   ${X11_LIBRARIES}
 )
