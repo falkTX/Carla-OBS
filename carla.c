@@ -9,6 +9,7 @@
 #include "qtutils.h"
 
 #include "CarlaNativePlugin.h"
+#include "CarlaFrontend.h"
 
 // generates a warning if this is defined as anything else
 #define CARLA_API
@@ -227,9 +228,26 @@ static struct obs_audio_data *carla_obs_filter_audio(void *data, struct obs_audi
     return audio;
 }
 
-static bool open_editor_button_clicked(obs_properties_t *props, obs_property_t *property, void *data)
+static bool carla_obs_plugin_add_callback(obs_properties_t *props, obs_property_t *property, void *data)
 {
     TRACE_CALL
+    struct carla_data *carla = data;
+
+    PluginListDialogResults *const results = carla_frontend_createAndExecPluginListDialog(NULL);
+
+    if (results == NULL)
+        return false;
+
+    // TODO
+    return true;
+}
+
+static bool carla_obs_show_gui_callback(obs_properties_t *props, obs_property_t *property, void *data)
+{
+    TRACE_CALL
+    UNUSED_PARAMETER(props);
+    UNUSED_PARAMETER(property);
+
     struct carla_data *carla = data;
 
     // TODO open plugin list dialog
@@ -240,7 +258,7 @@ static bool open_editor_button_clicked(obs_properties_t *props, obs_property_t *
 
     carla_show_custom_ui(carla->internalHostHandle, 0, true);
 
-    return true;
+    return false;
 }
 
 static bool carla_obs_param_changed(void *data, obs_properties_t *props, obs_property_t *property, obs_data_t *settings)
@@ -288,9 +306,8 @@ static obs_properties_t *carla_obs_get_properties(void *data)
 
     obs_properties_t *props = obs_properties_create();
 
-    obs_properties_add_button(props, "add-plugin", obs_module_text("Add plugin..."), open_editor_button_clicked);
-    obs_properties_add_button(props, "show-gui", obs_module_text("Show custom GUI"), open_editor_button_clicked);
-    // obs_properties_add_button(props, "settings", obs_module_text("Settings"), open_editor_button_clicked);
+    obs_properties_add_button(props, "add-plugin", obs_module_text("Add plugin..."), carla_obs_plugin_add_callback);
+    obs_properties_add_button(props, "show-gui", obs_module_text("Show custom GUI"), carla_obs_show_gui_callback);
 
     obs_data_t *settings = obs_source_get_settings(carla->source);
 
@@ -503,7 +520,6 @@ bool obs_module_load(void)
     filter.destroy = carla_obs_destroy;
     filter.update = carla_obs_update;
     filter.filter_audio = carla_obs_filter_audio;
-    // filter.get_defaults = carla_obs_get_defaults;
     filter.get_properties = carla_obs_get_properties;
     //filter.save = carla_obs_save;
 

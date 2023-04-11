@@ -1,6 +1,7 @@
 project(carla)
 
-find_qt(COMPONENTS Widgets)
+find_qt(COMPONENTS Core Widgets)
+find_package(X11)
 
 add_library(carla MODULE)
 add_library(OBS::carla ALIAS carla)
@@ -22,14 +23,17 @@ target_include_directories(carla PRIVATE
   carla/source
   carla/source/backend
   carla/source/backend/engine
+  carla/source/frontend
+  carla/source/frontend/pluginlist
+  carla/source/frontend/utils
   carla/source/includes
   carla/source/modules
   carla/source/utils
 )
 
-#target_link_options(carla PRIVATE
-#  -Wl,--no-undefined
-#)
+target_link_options(carla PRIVATE
+  -Wl,--no-undefined
+)
 
 ###############################################################################
 # lilv
@@ -200,6 +204,9 @@ target_sources(carla PRIVATE
   carla/source/backend/plugin/CarlaPluginSFZero.cpp
   carla/source/backend/plugin/CarlaPluginVST2.cpp
   carla/source/backend/plugin/CarlaPluginVST3.cpp
+  carla/source/frontend/carla_frontend.cpp
+  carla/source/frontend/pluginlist/pluginlistdialog.cpp
+  carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
   carla/source/jackbridge/JackBridge1.cpp
   carla/source/jackbridge/JackBridge2.cpp
   carla/source/modules/audio_decoder/ad_dr_mp3.c
@@ -243,9 +250,16 @@ target_link_libraries(carla PRIVATE
   OBS::carla_lilv
   OBS::carla_ysfx
   OBS::libobs
-  Qt::Widgets)
+  OBS::frontend-api
+  Qt::Core
+  Qt::Widgets
+  ${X11_LIBRARIES}
+)
 
-set_target_properties(image-source PROPERTIES
+set_target_properties(carla PROPERTIES
+  AUTOMOC ON
+  AUTOUIC ON
+  AUTORCC ON
   FOLDER "plugins"
   PROJECT_LABEL "Carla Plugin Host"
 )
