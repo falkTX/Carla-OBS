@@ -53,9 +53,6 @@ struct carla_data {
     // current OBS config
     size_t channels;
     uint32_t sampleRate;
-
-    // idle loop
-    carla_obs_idle_callback_data_t *idlecb;
 };
 
 static const char *carla_obs_get_name(void *unused)
@@ -88,8 +85,9 @@ fail:
     return NULL;
 }
 
-void carla_obs_idle_callback(void *data)
+void carla_obs_idle_callback(void *data, float unused)
 {
+    UNUSED_PARAMETER(unused);
     struct carla_data *carla = data;
     carla->descriptor->ui_idle(carla->handle);
 }
@@ -160,7 +158,7 @@ static void *carla_obs_create(obs_data_t *settings, obs_source_t *filter)
     // TESTING
     carla_add_plugin(carla->internalHostHandle, BINARY_NATIVE, PLUGIN_LV2, NULL, NULL, "http://aidadsp.cc/plugins/aidadsp-bundle/rt-neural-loader", 0, NULL, PLUGIN_OPTIONS_NULL);
 
-    carla->idlecb = carla_obs_add_idle_callback(carla_obs_idle_callback, carla);
+    obs_add_tick_callback(carla_obs_idle_callback, carla);
 
     const uint32_t params = carla->descriptor->get_parameter_count(carla->handle);
     char pname[] = {'C','a','r','l','a','.','p','0','0','0','\0'};
@@ -208,7 +206,7 @@ static void carla_obs_destroy(void *data)
 {
     TRACE_CALL
     struct carla_data *carla = data;
-    carla_obs_remove_idle_callback(carla->idlecb);
+    obs_remove_tick_callback(carla_obs_idle_callback, carla);
     carla_host_handle_free(carla->internalHostHandle);
     carla->descriptor->deactivate(carla->handle);
     carla->descriptor->cleanup(carla->handle);
@@ -242,7 +240,7 @@ static struct obs_audio_data *carla_obs_filter_audio(void *data, struct obs_audi
         {
             bufferPos = 0;
             carla->timeInfo.usecs = os_gettime_ns() * 1000;
-            carla->descriptor->process(carla->handle, carlabuffers, carlabuffers, frames, NULL, 0);
+            carla->descriptor->process(carla->handle, carlabuffers, carlabuffers, bufferSize, NULL, 0);
         }
 
         obsbuffers[1][i] = carlabuffers[1][j];

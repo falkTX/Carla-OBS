@@ -10,13 +10,7 @@
 extern "C" {
 #endif
 
-struct carla_obs_idle_callback_data;
-typedef struct carla_obs_idle_callback_data carla_obs_idle_callback_data_t;
-
-typedef void (*carla_obs_idle_callback_t)(void *data);
-
-carla_obs_idle_callback_data_t* carla_obs_add_idle_callback(carla_obs_idle_callback_t cb, void *data);
-void carla_obs_remove_idle_callback(carla_obs_idle_callback_data_t *cbdata);
+void carla_obs_callback_on_main_thread(void (*callback)(void *param), void *param);
 
 uintptr_t carla_obs_get_main_window_id(void);
 
