@@ -1,0 +1,5 @@
+../../libobs
+./carla/source/backend/
+./carla/source/includes/
+./carla/source/frontend/
+/usr/include/x86_64-linux-gnu/qt6

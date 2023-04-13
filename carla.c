@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
+// must match cmake config
+#define CARLA_PLUGIN_BUILD
+#define HAVE_X11
+#define REAL_BUILD
+#define STATIC_PLUGIN_TARGET
+
 #include <obs-module.h>
 #include <util/platform.h>
 #include "qtutils.h"
@@ -468,7 +474,7 @@ static const char* host_ui_open_file(const NativeHostHandle handle, const bool i
     return NULL;
 }
 
-static const char* host_ui_save_file(NativeHostHandle, bool isDir, const char* title, const char* filter)
+static const char* host_ui_save_file(const NativeHostHandle handle, bool isDir, const char* title, const char* filter)
 {
     return NULL;
 }
