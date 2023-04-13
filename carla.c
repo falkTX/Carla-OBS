@@ -68,7 +68,7 @@ struct carla_data {
 static const char *carla_obs_get_name(void *unused)
 {
     UNUSED_PARAMETER(unused);
-    return obs_module_text("Carla");
+    return obs_module_text("Carla Plugin Host");
 }
 
 static void *carla_obs_alloc(void)
@@ -95,7 +95,7 @@ fail:
     return NULL;
 }
 
-void carla_obs_idle_callback(void *data, float unused)
+static void carla_obs_idle_callback(void *data, float unused)
 {
     UNUSED_PARAMETER(unused);
     struct carla_data *carla = data;
@@ -167,8 +167,12 @@ static void *carla_obs_create(obs_data_t *settings, obs_source_t *source)
     descriptor->dispatcher(carla->handle, NATIVE_PLUGIN_OPCODE_HOST_USES_EMBED, 0, 0, NULL, 0.f);
     descriptor->activate(carla->handle);
 
+    /*
     // TESTING
-    carla_add_plugin(carla->internalHostHandle, BINARY_NATIVE, PLUGIN_LV2, NULL, NULL, "https://github.com/trummerschlunk/master_me", 0, NULL, PLUGIN_OPTIONS_NULL);
+    carla_add_plugin(carla->internalHostHandle, BINARY_NATIVE, PLUGIN_LV2, NULL, NULL,
+                     "https://github.com/trummerschlunk/master_me",
+                     0, NULL, PLUGIN_OPTIONS_NULL);
+    */
 
     obs_add_tick_callback(carla_obs_idle_callback, carla);
 
@@ -373,38 +377,38 @@ static void carla_obs_save(void *data, obs_data_t *settings)
 // --------------------------------------------------------------------------------------------------------------------
 // carla host methods
 
-static uint32_t host_get_buffer_size(const NativeHostHandle handle)
+static uint32_t host_get_buffer_size(NativeHostHandle handle)
 {
     const struct carla_data *carla = handle;
     return carla->bufferSize;
 }
 
-static double host_get_sample_rate(const NativeHostHandle handle)
+static double host_get_sample_rate(NativeHostHandle handle)
 {
     const struct carla_data *carla = handle;
     return carla->sampleRate;
 }
 
-static bool host_is_offline(const NativeHostHandle handle)
+static bool host_is_offline(NativeHostHandle handle)
 {
     UNUSED_PARAMETER(handle);
     return false;
 }
 
-static const NativeTimeInfo* host_get_time_info(const NativeHostHandle handle)
+static const NativeTimeInfo* host_get_time_info(NativeHostHandle handle)
 {
     const struct carla_data *carla = handle;
     return &carla->timeInfo;
 }
 
-static bool host_write_midi_event(const NativeHostHandle handle, const NativeMidiEvent* const event)
+static bool host_write_midi_event(NativeHostHandle handle, const NativeMidiEvent *event)
 {
     UNUSED_PARAMETER(handle);
     UNUSED_PARAMETER(event);
     return false;
 }
 
-static void host_ui_parameter_changed(NativeHostHandle handle, const uint32_t index, const float value)
+static void host_ui_parameter_changed(NativeHostHandle handle, uint32_t index, float value)
 {
     struct carla_data *carla = handle;
 
@@ -458,7 +462,7 @@ static void host_ui_midi_program_changed(NativeHostHandle handle, uint8_t channe
     UNUSED_PARAMETER(program);
 }
 
-static void host_ui_custom_data_changed(NativeHostHandle handle, const char* key, const char* value)
+static void host_ui_custom_data_changed(NativeHostHandle handle, const char *key, const char *value)
 {
     UNUSED_PARAMETER(handle);
     UNUSED_PARAMETER(key);
@@ -481,8 +485,8 @@ static const char* host_ui_save_file(NativeHostHandle handle, bool isDir, const 
     return carla_obs_file_dialog(true, isDir, title, filter);
 }
 
-static intptr_t host_dispatcher(const NativeHostHandle handle, const NativeHostDispatcherOpcode opcode,
-                                const int32_t index, const intptr_t value, void* const ptr, const float opt)
+static intptr_t host_dispatcher(NativeHostHandle handle, NativeHostDispatcherOpcode opcode,
+                                int32_t index, intptr_t value, void *ptr, float opt)
 {
     switch (opcode)
     {
