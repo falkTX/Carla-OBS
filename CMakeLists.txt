@@ -8,6 +8,7 @@ add_library(OBS::carla ALIAS carla)
 
 target_compile_definitions(carla PRIVATE
   CARLA_BACKEND_NAMESPACE=CarlaOBS
+  CARLA_ENGINE_WITHOUT_UI
   CARLA_LIB_EXT=".so"
   CARLA_PLUGIN_BUILD
   HAVE_X11

@@ -17,13 +17,18 @@
 #include "CarlaNativePlugin.h"
 #include "CarlaFrontend.h"
 
+// property names
+#define PROP_SELECT_PLUGIN "select-plugin"
+#define PROP_SHOW_GUI "show-gui"
+#define PROP_RELOAD "reload"
+
 // generates a warning if this is defined as anything else
 #define CARLA_API
 
 // maximum buffer used, could be lower
 #define MAX_AUDIO_BUFFER_SIZE 512
 
-#define TRACE_CALL printf("%s %d\n", __FUNCTION__, __LINE__);
+#define TRACE_CALL printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> %s %d\n", __FUNCTION__, __LINE__);
 
 // --------------------------------------------------------------------------------------------------------------------
 // forward declarations of carla host methods
@@ -41,6 +46,28 @@ static const char* host_ui_open_file(NativeHostHandle handle, bool isDir, const 
 static const char* host_ui_save_file(NativeHostHandle handle, bool isDir, const char* title, const char* filter);
 static intptr_t host_dispatcher(NativeHostHandle handle, NativeHostDispatcherOpcode opcode,
                                 int32_t index, intptr_t value, void* ptr, float opt);
+
+// --------------------------------------------------------------------------------------------------------------------
+// helper methods
+
+struct carla_param_data {
+    uint32_t hints;
+    float min, max;
+};
+
+struct carla_main_thread_param_change {
+    const NativePluginDescriptor* descriptor;
+    NativePluginHandle handle;
+    uint32_t index;
+    float value;
+};
+
+static void carla_main_thread_param_change(void *data)
+{
+    struct carla_main_thread_param_change *carla = data;
+    carla->descriptor->ui_set_parameter_value(carla->handle, carla->index, carla->value);
+    free(data);
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 // carla + obs integration methods
@@ -63,6 +90,9 @@ struct carla_data {
     // current OBS config
     size_t channels;
     uint32_t sampleRate;
+
+    // parameter handling
+    struct carla_param_data* paramDetails;
 };
 
 static const char *carla_obs_get_name(void *unused)
@@ -167,13 +197,6 @@ static void *carla_obs_create(obs_data_t *settings, obs_source_t *source)
     descriptor->dispatcher(carla->handle, NATIVE_PLUGIN_OPCODE_HOST_USES_EMBED, 0, 0, NULL, 0.f);
     descriptor->activate(carla->handle);
 
-    /*
-    // TESTING
-    carla_add_plugin(carla->internalHostHandle, BINARY_NATIVE, PLUGIN_LV2, NULL, NULL,
-                     "https://github.com/trummerschlunk/master_me",
-                     0, NULL, PLUGIN_OPTIONS_NULL);
-    */
-
     obs_add_tick_callback(carla_obs_idle_callback, carla);
 
     return carla;
@@ -198,13 +221,26 @@ static void carla_obs_destroy(void *data)
     carla->descriptor->cleanup(carla->handle);
     bfree(carla->abuffer2);
     bfree(carla->abuffer1);
+    bfree(carla->paramDetails);
     bfree(carla);
 }
 
 static void carla_obs_update(void *data, obs_data_t *settings)
 {
     TRACE_CALL
+//     struct carla_data *carla = data;
+    // carla->isUpdating = true;
+    // const char *json = obs_data_get_json_pretty(settings);
 
+    printf("carla_obs_update called for:");
+
+    for (obs_data_item_t *item = obs_data_first(settings); item != NULL; obs_data_item_next(&item))
+    {
+         printf(" %s,", obs_data_item_get_name(item));
+    }
+
+    printf("\n");
+    TRACE_CALL
 }
 
 static struct obs_audio_data *carla_obs_filter_audio(void *data, struct obs_audio_data *audio)
@@ -241,20 +277,32 @@ static struct obs_audio_data *carla_obs_filter_audio(void *data, struct obs_audi
 static bool carla_obs_plugin_add_callback(obs_properties_t *props, obs_property_t *property, void *data)
 {
     TRACE_CALL
+    UNUSED_PARAMETER(property);
     struct carla_data *carla = data;
 
     const PluginListDialogResults *plugin = carla_frontend_createAndExecPluginListDialog(carla_obs_get_main_window());
 
     if (plugin == NULL)
-        return true;
+        return false;
 
     if (carla_get_current_plugin_count(carla->internalHostHandle) != 0)
         carla_replace_plugin(carla->internalHostHandle, 0);
 
-    return !carla_add_plugin(carla->internalHostHandle,
-                             plugin->build, plugin->type,
-                             plugin->filename, plugin->name, plugin->label, plugin->uniqueId,
-                             NULL, PLUGIN_OPTIONS_NULL);
+    if (carla_add_plugin(carla->internalHostHandle,
+                         plugin->build, plugin->type,
+                         plugin->filename, plugin->name, plugin->label, plugin->uniqueId,
+                         NULL, PLUGIN_OPTIONS_NULL))
+    {
+        obs_source_t *source = carla->source;
+        obs_data_t *settings = obs_source_get_settings(source);
+        obs_data_set_int(settings, PROP_RELOAD, 1);
+        obs_properties_apply_settings(props, settings);
+        obs_data_release(settings);
+        return true;
+    }
+
+    TRACE_CALL
+    return false;
 }
 
 static bool carla_obs_show_gui_callback(obs_properties_t *props, obs_property_t *property, void *data)
@@ -273,61 +321,38 @@ static bool carla_obs_show_gui_callback(obs_properties_t *props, obs_property_t 
 
     carla_show_custom_ui(carla->internalHostHandle, 0, true);
 
+    TRACE_CALL
     return false;
 }
 
-static bool carla_obs_param_changed(void *data, obs_properties_t *props, obs_property_t *property, obs_data_t *settings)
+static bool carla_obs_param_changed(void *data, obs_properties_t *props, obs_property_t *property, obs_data_t *settings);
+
+static void carla_obs_readd_properties(struct carla_data *carla, obs_properties_t *props, obs_data_t *settings)
 {
-    TRACE_CALL
-    struct carla_data *carla = data;
-
-    const char *const pname = obs_property_name(property);
-    printf("param changed %s\n", pname);
-    if (pname == NULL)
-        return false;
-
-    const char* pname2 = pname + 1;
-    while (*pname2 == '0')
-        ++pname2;
-
-    float value;
-    switch (obs_property_get_type(property))
+    // show/hide GUI button
+    const bool hasGUI = carla_get_current_plugin_count(carla->internalHostHandle) != 0 &&
+                        carla_get_plugin_info(carla->internalHostHandle, 0)->hints & PLUGIN_HAS_CUSTOM_UI;
+    if (hasGUI)
     {
-    case OBS_PROPERTY_BOOL:
-        value = obs_data_get_bool(settings, pname) ? 1.f : 0.f;
-        break;
-    case OBS_PROPERTY_INT:
-        value = obs_data_get_int(settings, pname);
-        break;
-    case OBS_PROPERTY_FLOAT:
-        value = obs_data_get_double(settings, pname);
-        break;
-    default:
-        return false;
+        // obs_property_t *gui = obs_properties_get(props, PROP_SHOW_GUI);
+        obs_properties_add_button(props, PROP_SHOW_GUI, obs_module_text("Show custom GUI"), carla_obs_show_gui_callback);
+        // obs_property_set_enabled(gui, hasGUI);
+        // obs_property_set_visible(gui, hasGUI);
     }
 
-    const int pindex = atoi(pname2);
-
-    printf("param changed %d:%s %f\n", pindex, pname, value);
-    carla->descriptor->set_parameter_value(carla->handle, pindex, value);
-
-    return false;
-}
-
-static obs_properties_t *carla_obs_get_properties(void *data)
-{
-    TRACE_CALL
-    struct carla_data *carla = data;
-
-    obs_properties_t *props = obs_properties_create();
-
-    obs_properties_add_button(props, "add-plugin", obs_module_text("Add plugin..."), carla_obs_plugin_add_callback);
-    obs_properties_add_button(props, "show-gui", obs_module_text("Show custom GUI"), carla_obs_show_gui_callback);
-
-    obs_data_t *settings = obs_source_get_settings(carla->source);
+    // reload handling
+    {
+        obs_property_t *reload = obs_properties_add_int_slider(props, PROP_RELOAD, obs_module_text("Needs Reload"), 0, 1, 1);
+        obs_data_set_default_int(settings, PROP_RELOAD, 0);
+        obs_property_set_modified_callback2(reload, carla_obs_param_changed, carla);
+        obs_property_set_visible(reload, false);
+    }
 
     const uint32_t params = carla->descriptor->get_parameter_count(carla->handle);
     char pname[] = {'p','0','0','0','\0'};
+
+    bfree(carla->paramDetails);
+    carla->paramDetails = bzalloc(sizeof(struct carla_param_data) * params);
 
     for (uint32_t i=0; i < params; ++i)
     {
@@ -335,11 +360,16 @@ static obs_properties_t *carla_obs_get_properties(void *data)
 
         if ((info->hints & NATIVE_PARAMETER_IS_ENABLED) == 0)
             continue;
+        if (info->hints & NATIVE_PARAMETER_IS_OUTPUT)
+            break;
+
+        carla->paramDetails[i].hints = info->hints;
+        carla->paramDetails[i].min = info->ranges.min;
+        carla->paramDetails[i].max = info->ranges.max;
 
         pname[1] = '0' + ((i / 100) % 10);
         pname[2] = '0' + ((i / 10) % 10);
         pname[3] = '0' + (i % 10);
-        printf("adding slider '%s'\n", pname);
 
         obs_property_t *prop;
 
@@ -360,7 +390,8 @@ static obs_properties_t *carla_obs_get_properties(void *data)
         }
         else
         {
-            prop = obs_properties_add_float_slider(props, pname, info->name, info->ranges.min, info->ranges.max, 0.1);
+            prop = obs_properties_add_float_slider(props, pname, info->name,
+                                                   info->ranges.min, info->ranges.max, info->ranges.step);
 
             obs_data_set_default_double(settings, pname, info->ranges.def);
 
@@ -368,14 +399,163 @@ static obs_properties_t *carla_obs_get_properties(void *data)
                 obs_property_float_set_suffix(prop, info->unit);
         }
 
-        obs_property_set_modified_callback2(prop, carla_obs_param_changed, data);
+        obs_property_set_modified_callback2(prop, carla_obs_param_changed, carla);
+    }
+}
+
+static bool carla_obs_param_changed(void *data, obs_properties_t *props, obs_property_t *property, obs_data_t *settings)
+{
+    struct carla_data *carla = data;
+
+    const char *const pname = obs_property_name(property);
+    if (pname == NULL)
+    {
+        printf("param changed %s | FAIL\n", pname);
+        return false;
     }
 
+    printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> %s %d | %s\n", __FUNCTION__, __LINE__, pname);
+
+    if (!strcmp(pname, PROP_RELOAD))
+    {
+        // dont reload again
+        if (obs_data_get_int(settings, pname) == 0)
+            return false;
+        obs_data_set_int(settings, PROP_RELOAD, 0);
+
+        printf("carla_obs_param_changed needsReload\n");
+
+        char pname[] = {'p','0','0','0','\0'};
+
+        obs_data_unset_default_value(settings, PROP_RELOAD);
+        obs_data_unset_default_value(settings, PROP_SHOW_GUI);
+
+        obs_properties_remove_by_name(props, PROP_RELOAD);
+        obs_properties_remove_by_name(props, PROP_SHOW_GUI);
+
+        for (uint32_t i=0; i < 120; ++i)
+        {
+            pname[1] = '0' + ((i / 100) % 10);
+            pname[2] = '0' + ((i / 10) % 10);
+            pname[3] = '0' + (i % 10);
+
+            obs_data_unset_default_value(settings, pname);
+            obs_properties_remove_by_name(props, pname);
+        }
+
+        carla_obs_readd_properties(carla, props, settings);
+        return true;
+    }
+
+    printf("carla_obs_param_changed has props:");
+    for (obs_property_t *prop = obs_properties_first(props); prop != NULL; obs_property_next(&prop))
+    {
+         printf(" %s,", obs_property_name(prop));
+    }
+    printf("\n");
+
+    printf("carla_obs_param_changed has settings:");
+    for (obs_data_item_t *item = obs_data_first(settings); item != NULL; obs_data_item_next(&item))
+    {
+         printf(" %s,", obs_data_item_get_name(item));
+    }
+    printf("\n");
+
+    const char* pname2 = pname + 1;
+    while (*pname2 == '0')
+        ++pname2;
+
+    const int pindex = atoi(pname2);
+
+    const float min = carla->paramDetails[pindex].min;
+    const float max = carla->paramDetails[pindex].max;
+
+    float value;
+    switch (obs_property_get_type(property))
+    {
+    case OBS_PROPERTY_BOOL:
+        value = obs_data_get_bool(settings, pname) ? max : min;
+        break;
+    case OBS_PROPERTY_INT:
+        value = obs_data_get_int(settings, pname);
+        if (value < min)
+            value = min;
+        else if (value > max)
+            value = max;
+        break;
+    case OBS_PROPERTY_FLOAT:
+        value = obs_data_get_double(settings, pname);
+        if (value < min)
+            value = min;
+        else if (value > max)
+            value = max;
+        break;
+    default:
+        return false;
+    }
+
+    printf("param changed %d:%s %f\n", pindex, pname, value);
+    carla->descriptor->set_parameter_value(carla->handle, pindex, value);
+
+    // UI param change notification needs to happen on main thread
+    struct carla_main_thread_param_change mchange = {
+        .descriptor = carla->descriptor,
+        .handle = carla->handle,
+        .index = pindex,
+        .value = value
+    };
+    struct carla_main_thread_param_change *mchangeptr = malloc(sizeof(mchange));
+    *mchangeptr = mchange;
+    carla_obs_callback_on_main_thread(carla_main_thread_param_change, mchangeptr);
+
+    return false;
+}
+
+static obs_properties_t *carla_obs_get_properties(void *data)
+{
+    TRACE_CALL
+    struct carla_data *carla = data;
+
+    obs_properties_t *props = obs_properties_create();
+    obs_data_t *settings = obs_source_get_settings(carla->source);
+
+    obs_properties_add_button(props, PROP_SELECT_PLUGIN, obs_module_text("Select plugin..."), carla_obs_plugin_add_callback);
+
+    carla_obs_readd_properties(carla, props, settings);
+
+    obs_data_release(settings);
+
+    TRACE_CALL
     return props;
 }
 
 static void carla_obs_save(void *data, obs_data_t *settings)
 {
+    TRACE_CALL
+    struct carla_data *carla = data;
+
+    char *state = carla->descriptor->get_state(carla->handle);
+    if (state)
+    {
+        obs_data_set_string(settings, "state", state);
+        free(state);
+    }
+
+    TRACE_CALL
+}
+
+static void carla_obs_load(void *data, obs_data_t *settings)
+{
+    TRACE_CALL
+    struct carla_data *carla = data;
+
+    const char *state = obs_data_get_string(settings, "state");
+    if (state)
+    {
+        printf("got carla state:\n%s", state);
+        carla->descriptor->set_state(carla->handle, state);
+    }
+
     TRACE_CALL
 }
 
@@ -417,46 +597,29 @@ static void host_ui_parameter_changed(NativeHostHandle handle, uint32_t index, f
 {
     struct carla_data *carla = handle;
 
+    const uint32_t hints = carla->paramDetails[index].hints;
+    if ((hints & NATIVE_PARAMETER_IS_ENABLED) == 0)
+        return;
+
     char pname[] = {'p','0','0','0','\0'};
     pname[1] = '0' + ((index / 100) % 10);
     pname[2] = '0' + ((index / 10) % 10);
     pname[3] = '0' + (index % 10);
-    printf("changing slider %d:%s to %f - START\n", index, pname, value);
+    printf("host_ui_parameter_changed %d:%s to %f\n", index, pname, value);
 
     // FIXME this doesnt really work
 
     obs_source_t *source = carla->source;
-    obs_properties_t *properties = obs_source_properties(source);
-    obs_property_t *property = obs_properties_get(properties, pname);
-
-    if (property == NULL)
-        goto end2;
-
     obs_data_t *settings = obs_source_get_settings(source);
-    switch (obs_property_get_type(property))
-    {
-    case OBS_PROPERTY_BOOL:
+
+    if (hints & NATIVE_PARAMETER_IS_BOOLEAN)
         obs_data_set_bool(settings, pname, value > 0.5f ? 1.f : 0.f);
-        break;
-    case OBS_PROPERTY_INT:
+    else if (hints & NATIVE_PARAMETER_IS_INTEGER)
         obs_data_set_int(settings, pname, value);
-        break;
-    case OBS_PROPERTY_FLOAT:
+    else
         obs_data_set_double(settings, pname, value);
-        break;
-    default:
-        goto end;
-    }
 
-    obs_source_update(source, settings);
-
-    printf("changing slider %d:%s to %f - DONE\n", index, pname, value);
-
-end:
     obs_data_release(settings);
-
-end2:
-    obs_properties_destroy(properties);
 }
 
 static void host_ui_midi_program_changed(NativeHostHandle handle, uint8_t channel, uint32_t bank, uint32_t program)
@@ -538,7 +701,8 @@ bool obs_module_load(void)
     filter.update = carla_obs_update;
     filter.filter_audio = carla_obs_filter_audio;
     filter.get_properties = carla_obs_get_properties;
-    //filter.save = carla_obs_save;
+    filter.save = carla_obs_save;
+    filter.load = carla_obs_load;
 
     obs_register_source(&filter);
     return true;
