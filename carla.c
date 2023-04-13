@@ -243,13 +243,18 @@ static bool carla_obs_plugin_add_callback(obs_properties_t *props, obs_property_
     TRACE_CALL
     struct carla_data *carla = data;
 
-    PluginListDialogResults *const results = carla_frontend_createAndExecPluginListDialog(carla_obs_get_main_window());
+    const PluginListDialogResults *plugin = carla_frontend_createAndExecPluginListDialog(carla_obs_get_main_window());
 
-    if (results == NULL)
-        return false;
+    if (plugin == NULL)
+        return true;
 
-    // TODO
-    return true;
+    if (carla_get_current_plugin_count(carla->internalHostHandle) != 0)
+        carla_replace_plugin(carla->internalHostHandle, 0);
+
+    return !carla_add_plugin(carla->internalHostHandle,
+                             plugin->build, plugin->type,
+                             plugin->filename, plugin->name, plugin->label, plugin->uniqueId,
+                             NULL, PLUGIN_OPTIONS_NULL);
 }
 
 static bool carla_obs_show_gui_callback(obs_properties_t *props, obs_property_t *property, void *data)
