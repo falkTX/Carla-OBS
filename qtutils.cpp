@@ -8,7 +8,6 @@
 
 #include <QtCore/QTimer>
 #include <QtWidgets/QApplication>
-#include <QtWidgets/QMainWindow>
 
 void carla_obs_callback_on_main_thread(void (*callback)(void *param), void *param)
 {
@@ -24,25 +23,18 @@ void carla_obs_callback_on_main_thread(void (*callback)(void *param), void *para
 
 uintptr_t carla_obs_get_main_window_id(void)
 {
-    const QWidgetList &wl = QApplication::topLevelWidgets();
-
-    for (QWidget *w : wl)
-    {
-        if (QMainWindow *mw = qobject_cast<QMainWindow*>(w))
-            return mw->winId();
-    }
+    if (QMainWindow *mw = carla_obs_get_main_window())
+        return mw->winId();
 
     return 0;
 }
 
-void* carla_obs_get_main_window_qt_widget_ptr(void)
+QMainWindow* carla_obs_get_main_window(void)
 {
-    const QWidgetList &wl = QApplication::topLevelWidgets();
-
-    for (QWidget *w : wl)
+    for (QWidget *w : QApplication::topLevelWidgets())
     {
         if (QMainWindow *mw = qobject_cast<QMainWindow*>(w))
-            return w;
+            return mw;
     }
 
     return nullptr;

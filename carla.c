@@ -233,7 +233,7 @@ static bool carla_obs_plugin_add_callback(obs_properties_t *props, obs_property_
     TRACE_CALL
     struct carla_data *carla = data;
 
-    PluginListDialogResults *const results = carla_frontend_createAndExecPluginListDialog(carla_obs_get_main_window_qt_widget_ptr());
+    PluginListDialogResults *const results = carla_frontend_createAndExecPluginListDialog(carla_obs_get_main_window());
 
     if (results == NULL)
         return false;
