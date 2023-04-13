@@ -8,6 +8,7 @@
 
 #include <QtCore/QTimer>
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QFileDialog>
 
 void carla_obs_callback_on_main_thread(void (*callback)(void *param), void *param)
 {
@@ -19,6 +20,28 @@ void carla_obs_callback_on_main_thread(void (*callback)(void *param), void *para
         maintimer->deleteLater();
     });
     QMetaObject::invokeMethod(maintimer, "start", Qt::QueuedConnection, Q_ARG(int, 0));
+}
+
+const char* carla_obs_file_dialog(bool save, bool isDir, const char *title, const char *filter)
+{
+    static QByteArray ret;
+
+    QWidget *parent = carla_obs_get_main_window();
+    QFileDialog::Options options;
+
+    if (isDir)
+        options |= QFileDialog::ShowDirsOnly;
+
+    if (save)
+    {
+        ret = QFileDialog::getSaveFileName(parent, title, {}, filter, nullptr, options).toUtf8();
+    }
+    else
+    {
+        ret = QFileDialog::getOpenFileName(parent, title, {}, filter, nullptr, options).toUtf8();
+    }
+
+    return ret.constData();
 }
 
 uintptr_t carla_obs_get_main_window_id(void)

@@ -17,6 +17,8 @@ typedef struct QMainWindow QMainWindow;
 
 void carla_obs_callback_on_main_thread(void (*callback)(void *param), void *param);
 
+const char* carla_obs_file_dialog(bool save, bool isDir, const char *title, const char *filter);
+
 uintptr_t carla_obs_get_main_window_id(void);
 QMainWindow* carla_obs_get_main_window(void);
 

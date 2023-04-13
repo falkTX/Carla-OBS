@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-// must match cmake config
-#define CARLA_PLUGIN_BUILD
-#define HAVE_X11
-#define REAL_BUILD
-#define STATIC_PLUGIN_TARGET
+// IDE helpers, must match cmake config
+#define CARLA_PLUGIN_BUILD 1
+#define HAVE_X11 1
+#define REAL_BUILD 1
+#define STATIC_PLUGIN_TARGET 1
 
 #include <obs-module.h>
 #include <util/platform.h>
@@ -469,14 +469,16 @@ static void host_ui_closed(NativeHostHandle handle)
 {
 }
 
-static const char* host_ui_open_file(const NativeHostHandle handle, const bool isDir, const char* const title, const char* const filter)
+static const char* host_ui_open_file(NativeHostHandle handle, bool isDir, const char *title, const char *filter)
 {
-    return NULL;
+    UNUSED_PARAMETER(handle);
+    return carla_obs_file_dialog(false, isDir, title, filter);
 }
 
-static const char* host_ui_save_file(const NativeHostHandle handle, bool isDir, const char* title, const char* filter)
+static const char* host_ui_save_file(NativeHostHandle handle, bool isDir, const char *title, const char *filter)
 {
-    return NULL;
+    UNUSED_PARAMETER(handle);
+    return carla_obs_file_dialog(true, isDir, title, filter);
 }
 
 static intptr_t host_dispatcher(const NativeHostHandle handle, const NativeHostDispatcherOpcode opcode,
