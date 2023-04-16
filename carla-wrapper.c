@@ -420,6 +420,24 @@ void carla_priv_set_state(struct carla_priv *priv, const char *state)
 
 // --------------------------------------------------------------------------------------------------------------------
 
+static void carla_priv_remove_all_props(obs_properties_t *props, obs_data_t *settings)
+{
+    obs_data_unset_default_value(settings, PROP_SHOW_GUI);
+    obs_properties_remove_by_name(props, PROP_SHOW_GUI);
+
+    char pname[] = {'p','0','0','0','\0'};
+
+    for (uint32_t i=0; i < 120; ++i)
+    {
+        pname[1] = '0' + ((i / 100) % 10);
+        pname[2] = '0' + ((i / 10) % 10);
+        pname[3] = '0' + (i % 10);
+
+        obs_data_unset_default_value(settings, pname);
+        obs_properties_remove_by_name(props, pname);
+    }
+}
+
 static bool carla_priv_param_changed(void *data, obs_properties_t *props, obs_property_t *property, obs_data_t *settings)
 {
     struct carla_priv *priv = data;
@@ -431,52 +449,6 @@ static bool carla_priv_param_changed(void *data, obs_properties_t *props, obs_pr
         return false;
     }
 
-    if (!strcmp(pname, PROP_RELOAD))
-    {
-        printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> %s %d | %s\n", __FUNCTION__, __LINE__, pname);
-
-        printf("carla_priv_param_changed has props:");
-        for (obs_property_t *prop = obs_properties_first(props); prop != NULL; obs_property_next(&prop))
-        {
-            printf(" %s,", obs_property_name(prop));
-        }
-        printf("\n");
-
-        printf("carla_priv_param_changed has settings:");
-        for (obs_data_item_t *item = obs_data_first(settings); item != NULL; obs_data_item_next(&item))
-        {
-            printf(" %s,", obs_data_item_get_name(item));
-        }
-        printf("\n");
-
-        // dont reload again
-        if (obs_data_get_int(settings, pname) == 0)
-            return false;
-        obs_data_set_int(settings, PROP_RELOAD, 0);
-
-        printf("carla_priv_param_changed needsReload\n");
-
-        char pname[] = {'p','0','0','0','\0'};
-
-        obs_data_unset_default_value(settings, PROP_RELOAD);
-        obs_data_unset_default_value(settings, PROP_SHOW_GUI);
-
-        obs_properties_remove_by_name(props, PROP_RELOAD);
-        obs_properties_remove_by_name(props, PROP_SHOW_GUI);
-
-        for (uint32_t i=0; i < 120; ++i)
-        {
-            pname[1] = '0' + ((i / 100) % 10);
-            pname[2] = '0' + ((i / 10) % 10);
-            pname[3] = '0' + (i % 10);
-
-            obs_data_unset_default_value(settings, pname);
-            obs_properties_remove_by_name(props, pname);
-        }
-
-        carla_priv_readd_properties(priv, props);
-        return true;
-    }
     const char* pname2 = pname + 1;
     while (*pname2 == '0')
         ++pname2;
@@ -540,14 +512,6 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
         obs_properties_add_button2(props, PROP_SHOW_GUI, obs_module_text("Show custom GUI"), carla_priv_show_gui_callback, priv);
         // obs_property_set_enabled(gui, hasGUI);
         // obs_property_set_visible(gui, hasGUI);
-    }
-
-    // reload handling
-    {
-        obs_property_t *reload = obs_properties_add_int_slider(props, PROP_RELOAD, obs_module_text("Needs Reload"), 0, 1, 1);
-        obs_data_set_default_int(settings, PROP_RELOAD, 0);
-        obs_property_set_modified_callback2(reload, carla_priv_param_changed, priv);
-        obs_property_set_visible(reload, false);
     }
 
     const uint32_t params = priv->descriptor->get_parameter_count(priv->handle);
@@ -629,15 +593,14 @@ bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *
                          plugin->filename, plugin->name, plugin->label, plugin->uniqueId,
                          NULL, PLUGIN_OPTIONS_NULL))
     {
-        obs_source_t *source = source;
+        obs_source_t *source = priv->source;
         obs_data_t *settings = obs_source_get_settings(source);
-        obs_data_set_int(settings, PROP_RELOAD, 1);
-        obs_properties_apply_settings(props, settings);
+        carla_priv_remove_all_props(props, settings);
+        carla_priv_readd_properties(priv, props);
         obs_data_release(settings);
         return true;
     }
 
-    TRACE_CALL
     return false;
 }
 

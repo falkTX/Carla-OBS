@@ -11,7 +11,6 @@
 // property names
 #define PROP_SELECT_PLUGIN "select-plugin"
 #define PROP_SHOW_GUI "show-gui"
-#define PROP_RELOAD "reload"
 
 // debug
 #define TRACE_CALL printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> %s %d\n", __FUNCTION__, __LINE__);
