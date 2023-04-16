@@ -10,8 +10,6 @@
 
 // for audio generator thread
 #include <threads.h>
-#include <time.h>
-#include <unistd.h>
 
 // IDE helpers, must match cmake config
 #define CARLA_PLUGIN_BUILD 1
@@ -112,15 +110,13 @@ static int carla_audio_gen_thread(void *data)
     float buf2[CARLA_AUDIO_GEN_BUFFER_SIZE] = {0.f};
     float* bufs[2] = {buf1,buf2};
 
-    struct obs_source_audio out = {};
-    out.data[0] = (uint8_t *)buf1;
-    out.data[1] = (uint8_t *)buf2;
-    for (int i=2; i<MAX_AV_PLANES; ++i)
-        out.data[i] = NULL;
-    out.frames = CARLA_AUDIO_GEN_BUFFER_SIZE;
-    out.speakers = SPEAKERS_STEREO;
-    out.format = AUDIO_FORMAT_FLOAT_PLANAR;
-    out.samples_per_sec = priv->sampleRate;
+    struct obs_source_audio out = {
+        .data = {(uint8_t *)buf1,(uint8_t *)buf2,NULL},
+        .frames = CARLA_AUDIO_GEN_BUFFER_SIZE,
+        .speakers = SPEAKERS_STEREO,
+        .format = AUDIO_FORMAT_FLOAT_PLANAR,
+        .samples_per_sec = priv->sampleRate,
+    };
 
     const uint64_t slice = CARLA_AUDIO_GEN_BUFFER_SIZE * 1000000000ULL / priv->sampleRate;
 
@@ -150,21 +146,12 @@ static int carla_audio_gen_thread(void *data)
         if (slice <= diff)
             continue;
 
-#if 0
-        // FIXME get this part to work
-        struct timespec nowts;
-        clock_gettime(CLOCK_REALTIME, &nowts);
-        now = nowts.tv_sec * 1000000000ULL + nowts.tv_nsec;
-
-        const uint64_t target = now + slice - diff;
+        const uint64_t target = slice - diff;
         const struct timespec timeout = {
             target / 1000000000ULL,
             target % 1000000000ULL
         };
         thrd_sleep(&timeout, NULL);
-#else
-        usleep((slice - diff) / 1000);
-#endif
     }
 
     return thrd_success;
