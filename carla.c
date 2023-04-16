@@ -11,14 +11,6 @@
 
 // --------------------------------------------------------------------------------------------------------------------
 
-enum buffer_size_mode {
-    buffer_size_dynamic,
-    buffer_size_static_128,
-    buffer_size_static_256,
-    buffer_size_static_512,
-    buffer_size_static_max = buffer_size_static_512
-};
-
 struct carla_data {
     // carla host details, intentionally kept private so we can easily swap internals
     struct carla_priv *priv;
@@ -48,8 +40,8 @@ static void carla_obs_idle_callback(void *data, float unused)
 
 static const char *carla_obs_get_name(void *data)
 {
-    return !strcmp(data, "filter") ? obs_module_text("Audio Plugin Filter")
-                                   : obs_module_text("Audio Plugin Input");
+    return !strcmp(data, "filter") ? obs_module_text("Carla Plugin Host (Filter)")
+                                   : obs_module_text("Carla Plugin Host (Input)");
 }
 
 static void *carla_obs_create(obs_data_t *settings, obs_source_t *source, bool isFilter)
@@ -268,8 +260,8 @@ bool obs_module_load(void)
         // get_width, get_height, get_defaults
         .get_properties = carla_obs_get_properties,
         // update
-//         .activate = carla_obs_activate,
-//         .deactivate = carla_obs_deactivate,
+        .activate = carla_obs_activate,
+        .deactivate = carla_obs_deactivate,
         // show, hide, video_tick, video_render, filter_video
         .filter_audio = carla_obs_filter_audio,
         // enum_active_sources
@@ -296,8 +288,8 @@ bool obs_module_load(void)
         // get_width, get_height, get_defaults
         .get_properties = carla_obs_get_properties,
         // update
-//         .activate = carla_obs_activate,
-//         .deactivate = carla_obs_deactivate,
+        .activate = carla_obs_activate,
+        .deactivate = carla_obs_deactivate,
         // show, hide, video_tick, video_render, filter_video, filter_audio, enum_active_sources
         .save = carla_obs_save,
         .load = carla_obs_load,

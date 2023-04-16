@@ -17,10 +17,18 @@
 
 struct carla_priv;
 
+enum buffer_size_mode {
+    buffer_size_dynamic,
+    buffer_size_static_128,
+    buffer_size_static_256,
+    buffer_size_static_512,
+    buffer_size_static_max = buffer_size_static_512
+};
+
 // --------------------------------------------------------------------------------------------------------------------
 // carla + obs integration methods
 
-struct carla_priv *carla_priv_create(obs_source_t *source, uint32_t bufferSize, uint32_t sampleRate);
+struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode bufsize, uint32_t srate);
 void carla_priv_destroy(struct carla_priv *carla);
 
 void carla_priv_activate(struct carla_priv *carla);

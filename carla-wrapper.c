@@ -8,7 +8,7 @@
 #include "qtutils.h"
 #include <util/platform.h>
 
-// TESTING audio generator mode
+// for audio generator thread
 #include <threads.h>
 #include <time.h>
 #include <unistd.h>
@@ -25,7 +25,7 @@
 // generates a warning if this is defined as anything else
 #define CARLA_API
 
-#define CARLA_AUDIO_GEN_BUFFER_SIZE 512
+#define CARLA_AUDIO_GEN_BUFFER_SIZE 128
 #define CARLA_MAX_PARAMS 100
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -89,15 +89,15 @@ struct carla_priv {
     CarlaHostHandle internalHostHandle;
     struct carla_param_data* paramDetails;
 
-    // keep track of active state, TODO check if needed
-    volatile bool active;
-
     // update properties when timeout is reached, 0 means do nothing
     uint64_t update_requested;
 
-    // TESTING audio generator mode
-    thrd_t thread;
-    volatile bool runningThread;
+    // keep track of active state
+    volatile bool activated;
+
+    // audio generator thread
+    volatile bool audiogen_running;
+    thrd_t audiogen_thread;
 };
 
 static int carla_audio_gen_thread(void *data)
@@ -124,15 +124,14 @@ static int carla_audio_gen_thread(void *data)
 
     const uint64_t slice = CARLA_AUDIO_GEN_BUFFER_SIZE * 1000000000ULL / priv->sampleRate;
 
-    uint32_t xruns = 0;
     uint64_t now, prev, diff;
     prev = now = os_gettime_ns();
 
-    while (priv->runningThread)
+    while (priv->audiogen_running)
     {
         prev = now = os_gettime_ns();
 
-        if (priv->active)
+        if (priv->activated)
         {
             out.timestamp = now;
             priv->timeInfo.usecs = now / 1000;
@@ -142,23 +141,14 @@ static int carla_audio_gen_thread(void *data)
         }
 
         // time went backwards!
-        if (now < prev) {
-            printf("_______________________________________________________________________________ backwards time\n");
-            if (++xruns == 1000)
-                break;
+        if (now < prev)
             continue;
-        }
 
         diff = now - prev;
 
         // xrun!
-        if (slice <= diff) {
-            printf("______________________________________________________________________ xrun | %lu %lu | %lu %lu\n",
-                   slice, diff, prev, now);
-            if (++xruns == 1000)
-                break;
+        if (slice <= diff)
             continue;
-        }
 
 #if 0
         // FIXME get this part to work
@@ -316,7 +306,7 @@ static intptr_t host_dispatcher(NativeHostHandle handle, NativeHostDispatcherOpc
 // --------------------------------------------------------------------------------------------------------------------
 // carla + obs integration methods
 
-struct carla_priv *carla_priv_create(obs_source_t *source, uint32_t bufferSize, uint32_t sampleRate)
+struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode bufsize, uint32_t srate)
 {
     const NativePluginDescriptor* descriptor = carla_get_native_rack_plugin();
     if (descriptor == NULL)
@@ -327,16 +317,29 @@ struct carla_priv *carla_priv_create(obs_source_t *source, uint32_t bufferSize, 
         return NULL;
 
     priv->source = source;
-    priv->bufferSize = bufferSize;
-    priv->sampleRate = sampleRate;
+    priv->sampleRate = srate;
     priv->descriptor = descriptor;
 
-    if (bufferSize == 0)
+    switch (bufsize)
     {
-        // TESTING audio generator mode
+    case buffer_size_dynamic:
         priv->bufferSize = CARLA_AUDIO_GEN_BUFFER_SIZE;
-        priv->runningThread = true;
+        priv->audiogen_running = true;
+        break;
+    case buffer_size_static_128:
+        priv->bufferSize = 128;
+        break;
+    case buffer_size_static_256:
+        priv->bufferSize = 128;
+        break;
+    case buffer_size_static_512:
+        priv->bufferSize = 128;
+        break;
     }
+
+    assert(priv->bufferSize != 0);
+    if (priv->bufferSize == 0)
+        goto fail1;
 
     {
         NativeHostDescriptor host = {
@@ -377,13 +380,8 @@ struct carla_priv *carla_priv_create(obs_source_t *source, uint32_t bufferSize, 
 
     descriptor->dispatcher(priv->handle, NATIVE_PLUGIN_OPCODE_HOST_USES_EMBED, 0, 0, NULL, 0.f);
 
-    // TODO obs_source_active
-    priv->active = true;
-    priv->descriptor->activate(priv->handle);
-
-    // TESTING audio generator mode
-    if (priv->runningThread)
-        thrd_create(&priv->thread, carla_audio_gen_thread, priv);
+    if (priv->audiogen_running)
+        thrd_create(&priv->audiogen_thread, carla_audio_gen_thread, priv);
 
     return priv;
 
@@ -397,14 +395,8 @@ fail1:
 
 void carla_priv_destroy(struct carla_priv *priv)
 {
-    if (priv->runningThread)
-    {
-        priv->runningThread = false;
-        thrd_join(priv->thread, NULL);
-    }
-
-    if (priv->active)
-        priv->descriptor->deactivate(priv->handle);
+    if (priv->activated)
+        carla_priv_deactivate(priv);
 
     carla_host_handle_free(priv->internalHostHandle);
     priv->descriptor->cleanup(priv->handle);
@@ -414,23 +406,26 @@ void carla_priv_destroy(struct carla_priv *priv)
 
 // --------------------------------------------------------------------------------------------------------------------
 
-// void carla_priv_activate(struct carla_priv *priv)
-// {
-//     priv->descriptor->activate(priv->handle);
-//     priv->active = true;
-// }
-//
-// void carla_priv_deactivate(struct carla_priv *priv)
-// {
-//     if (priv->runningThread)
-//     {
-//         priv->runningThread = false;
-//         thrd_join(priv->thread, NULL);
-//     }
-//
-//     priv->active = false;
-//     priv->descriptor->deactivate(priv->handle);
-// }
+void carla_priv_activate(struct carla_priv *priv)
+{
+    assert(!priv->activated);
+    priv->descriptor->activate(priv->handle);
+    priv->activated = true;
+}
+
+void carla_priv_deactivate(struct carla_priv *priv)
+{
+    assert(priv->activated);
+    priv->activated = false;
+
+    if (priv->audiogen_running)
+    {
+        priv->audiogen_running = false;
+        thrd_join(priv->audiogen_thread, NULL);
+    }
+
+    priv->descriptor->deactivate(priv->handle);
+}
 
 void carla_priv_process_audio(struct carla_priv *priv, float *buffers[2], uint32_t frames)
 {
