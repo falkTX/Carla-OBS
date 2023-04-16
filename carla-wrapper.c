@@ -203,7 +203,7 @@ static void host_ui_parameter_changed(NativeHostHandle handle, uint32_t index, f
     obs_source_t *source = priv->source;
     obs_data_t *settings = obs_source_get_settings(source);
 
-    if (hints & NATIVE_PARAMETER_IS_BOOLEAN)
+    /**/ if (hints & NATIVE_PARAMETER_IS_BOOLEAN)
         obs_data_set_bool(settings, pname, value > 0.5f ? 1.f : 0.f);
     else if (hints & NATIVE_PARAMETER_IS_INTEGER)
         obs_data_set_int(settings, pname, value);
@@ -581,9 +581,10 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
 
             obs_data_set_default_bool(settings, pname, info->ranges.def == info->ranges.max);
         }
-        else if (info->hints & PARAMETER_IS_INTEGER)
+        else if (info->hints & NATIVE_PARAMETER_IS_INTEGER)
         {
-            prop = obs_properties_add_int_slider(props, pname, info->name, info->ranges.min, info->ranges.max, 1);
+            prop = obs_properties_add_int_slider(props, pname, info->name,
+                                                 info->ranges.min, info->ranges.max, info->ranges.step);
 
             obs_data_set_default_int(settings, pname, info->ranges.def);
 

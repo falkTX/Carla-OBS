@@ -32,14 +32,8 @@ const char* carla_qt_file_dialog(bool save, bool isDir, const char *title, const
     if (isDir)
         options |= QFileDialog::ShowDirsOnly;
 
-    if (save)
-    {
-        ret = QFileDialog::getSaveFileName(parent, title, {}, filter, nullptr, options).toUtf8();
-    }
-    else
-    {
-        ret = QFileDialog::getOpenFileName(parent, title, {}, filter, nullptr, options).toUtf8();
-    }
+    ret = save ? QFileDialog::getSaveFileName(parent, title, {}, filter, nullptr, options).toUtf8()
+               : QFileDialog::getOpenFileName(parent, title, {}, filter, nullptr, options).toUtf8();
 
     return ret.constData();
 }
