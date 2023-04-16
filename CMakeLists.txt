@@ -1,7 +1,24 @@
 project(carla)
 
 find_qt(COMPONENTS Core Gui Widgets)
-find_package(X11)
+
+find_package(PkgConfig)
+
+# optional: used for plugin UIs on freedesktop systems
+if(UNIX AND NOT APPLE)
+  pkg_check_modules(X11 "x11")
+endif()
+
+# optional: finds correct plugin binary type
+if(NOT WIN32)
+  pkg_check_modules(LIBMAGIC "libmagic")
+endif()
+
+# optional: used for DSSI plugin UIs
+pkg_check_modules(LIBLO "liblo")
+
+# optional: extra audio file support
+pkg_check_modules(SNDFILE "sndfile")
 
 add_library(carla MODULE)
 add_library(OBS::carla ALIAS carla)
@@ -11,9 +28,12 @@ target_compile_definitions(carla PRIVATE
   CARLA_ENGINE_WITHOUT_UI
   CARLA_LIB_EXT=".so"
   CARLA_PLUGIN_BUILD
-  HAVE_X11
   REAL_BUILD
   STATIC_PLUGIN_TARGET
+  $<${LIBLO_FOUND}:HAVE_LIBLO>
+  $<${LIBMAGIC_FOUND}:HAVE_LIBMAGIC>
+  $<${SNDFILE_FOUND}:HAVE_SNDFILE>
+  $<${X11_FOUND}:HAVE_X11>
 )
 
 target_compile_options(carla PRIVATE
@@ -30,6 +50,10 @@ target_include_directories(carla PRIVATE
   carla/source/includes
   carla/source/modules
   carla/source/utils
+  ${LIBLO_INCLUDE_DIRS}
+  ${LIBMAGIC_INCLUDE_DIRS}
+  ${SNDFILE_INCLUDE_DIRS}
+  ${X11_INCLUDE_DIRS}
 )
 
 target_link_options(carla PRIVATE
@@ -189,6 +213,9 @@ target_sources(carla PRIVATE
   carla/source/backend/engine/CarlaEngineGraph.cpp
   carla/source/backend/engine/CarlaEngineInternal.cpp
   carla/source/backend/engine/CarlaEngineNative.cpp
+  carla/source/backend/engine/CarlaEngineOsc.cpp
+  carla/source/backend/engine/CarlaEngineOscHandlers.cpp
+  carla/source/backend/engine/CarlaEngineOscSend.cpp
   carla/source/backend/engine/CarlaEnginePorts.cpp
   carla/source/backend/engine/CarlaEngineRunner.cpp
   carla/source/backend/plugin/CarlaPlugin.cpp
@@ -248,6 +275,13 @@ target_sources(carla PRIVATE
 #notes.cpp
 #xycontroller.cpp
 
+target_link_directories(carla PRIVATE
+  ${LIBLO_LIBRARY_DIRS}
+  ${LIBMAGIC_LIBRARY_DIRS}
+  ${SNDFILE_LIBRARY_DIRS}
+  ${X11_LIBRARY_DIRS}
+)
+
 target_link_libraries(carla PRIVATE
   OBS::carla_lilv
   OBS::carla_ysfx
@@ -256,6 +290,9 @@ target_link_libraries(carla PRIVATE
   Qt::Core
   Qt::Gui
   Qt::Widgets
+  ${LIBLO_LIBRARIES}
+  ${LIBMAGIC_LIBRARIES}
+  ${SNDFILE_LIBRARIES}
   ${X11_LIBRARIES}
 )
 
