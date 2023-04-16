@@ -614,6 +614,36 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
 
 // --------------------------------------------------------------------------------------------------------------------
 
+static bool carla_post_load_callback(struct carla_priv *priv, obs_properties_t *props)
+{
+    obs_source_t *source = priv->source;
+    obs_data_t *settings = obs_source_get_settings(source);
+    remove_all_props(props, settings);
+    carla_priv_readd_properties(priv, props);
+    obs_data_release(settings);
+    return true;
+}
+
+bool carla_priv_load_file_callback(obs_properties_t *props, obs_property_t *property, void *data)
+{
+    UNUSED_PARAMETER(property);
+
+    struct carla_priv *priv = data;
+
+    const char *filename = carla_qt_file_dialog(false, false, obs_module_text("Load File"), NULL);
+
+    if (filename == NULL)
+        return false;
+
+    if (carla_get_current_plugin_count(priv->internalHostHandle) != 0)
+        carla_replace_plugin(priv->internalHostHandle, 0);
+
+    if (carla_load_file(priv->internalHostHandle, filename))
+        return carla_post_load_callback(priv, props);
+
+    return false;
+}
+
 bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *property, void *data)
 {
     UNUSED_PARAMETER(property);
@@ -632,14 +662,7 @@ bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *
                          plugin->build, plugin->type,
                          plugin->filename, plugin->name, plugin->label, plugin->uniqueId,
                          NULL, PLUGIN_OPTIONS_NULL))
-    {
-        obs_source_t *source = priv->source;
-        obs_data_t *settings = obs_source_get_settings(source);
-        remove_all_props(props, settings);
-        carla_priv_readd_properties(priv, props);
-        obs_data_release(settings);
-        return true;
-    }
+        return carla_post_load_callback(priv, props);
 
     return false;
 }

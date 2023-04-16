@@ -9,6 +9,7 @@
 #include <obs-module.h>
 
 // property names
+#define PROP_LOAD_FILE "load-file"
 #define PROP_SELECT_PLUGIN "select-plugin"
 #define PROP_SHOW_GUI "show-gui"
 
@@ -43,6 +44,7 @@ void carla_priv_set_buffer_size(struct carla_priv *priv, enum buffer_size_mode b
 
 void carla_priv_readd_properties(struct carla_priv *carla, obs_properties_t *props);
 
+bool carla_priv_load_file_callback(obs_properties_t *props, obs_property_t *property, void *data);
 bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *property, void *data);
 bool carla_priv_show_gui_callback(obs_properties_t *props, obs_property_t *property, void *data);
 
