@@ -11,7 +11,6 @@
 // TESTING audio generator mode
 #include <threads.h>
 #include <time.h>
-#include <sys/time.h>
 #include <unistd.h>
 
 // IDE helpers, must match cmake config
@@ -46,7 +45,7 @@ static void carla_main_thread_param_change(void *data)
 {
     struct carla_main_thread_param_change *priv = data;
     priv->descriptor->ui_set_parameter_value(priv->handle, priv->index, priv->value);
-    free(data);
+    bfree(data);
 }
 
 static void param_index_to_name(uint index, char name[PARAM_NAME_SIZE])
@@ -90,9 +89,14 @@ struct carla_priv {
     CarlaHostHandle internalHostHandle;
     struct carla_param_data* paramDetails;
 
+    // keep track of active state, TODO check if needed
+    volatile bool active;
+
+    // update properties when timeout is reached, 0 means do nothing
+    uint64_t update_requested;
+
     // TESTING audio generator mode
     thrd_t thread;
-    volatile bool active;
     volatile bool runningThread;
 };
 
@@ -214,21 +218,20 @@ static void host_ui_parameter_changed(NativeHostHandle handle, uint32_t index, f
 {
     struct carla_priv *priv = handle;
 
+    // skip parameters that we do not show
     const uint32_t hints = priv->paramDetails[index].hints;
     if ((hints & NATIVE_PARAMETER_IS_ENABLED) == 0)
         return;
     if (hints & NATIVE_PARAMETER_IS_OUTPUT)
         return;
 
+#if 0
+    // NOTE this doesnt really work, OBS UI is not updated
     char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
     param_index_to_name(index, pname);
-    printf("host_ui_parameter_changed %d:%s to %f\n", index, pname, value);
-
-    // FIXME this doesnt really work
 
     obs_source_t *source = priv->source;
     obs_data_t *settings = obs_source_get_settings(source);
-    signal_handler_t *sighandler = obs_source_get_signal_handler(source);
 
     /**/ if (hints & NATIVE_PARAMETER_IS_BOOLEAN)
         obs_data_set_bool(settings, pname, value > 0.5f ? 1.f : 0.f);
@@ -238,6 +241,11 @@ static void host_ui_parameter_changed(NativeHostHandle handle, uint32_t index, f
         obs_data_set_double(settings, pname, value);
 
     obs_data_release(settings);
+#else
+    UNUSED_PARAMETER(value);
+#endif
+
+    priv->update_requested = os_gettime_ns();
 }
 
 static void host_ui_midi_program_changed(NativeHostHandle handle, uint8_t channel, uint32_t bank, uint32_t program)
@@ -433,6 +441,26 @@ void carla_priv_process_audio(struct carla_priv *priv, float *buffers[2], uint32
 void carla_priv_idle(struct carla_priv *priv)
 {
     priv->descriptor->ui_idle(priv->handle);
+
+    if (priv->update_requested != 0)
+    {
+        const uint64_t now = os_gettime_ns();
+
+        // request in the future?
+        if (now < priv->update_requested)
+        {
+            priv->update_requested = now;
+            return;
+        }
+
+        if (now - priv->update_requested >= 100000000ULL) // 100ms
+        {
+            priv->update_requested = 0;
+
+            signal_handler_t *sighandler = obs_source_get_signal_handler(priv->source);
+            signal_handler_signal(sighandler, "update_properties", NULL);
+        }
+    }
 }
 
 char *carla_priv_get_state(struct carla_priv *priv)
@@ -449,14 +477,12 @@ void carla_priv_set_state(struct carla_priv *priv, const char *state)
 
 static bool carla_priv_param_changed(void *data, obs_properties_t *props, obs_property_t *property, obs_data_t *settings)
 {
+    UNUSED_PARAMETER(props);
     struct carla_priv *priv = data;
 
     const char *const pname = obs_property_name(property);
     if (pname == NULL)
-    {
-        printf("param changed | FAIL\n");
         return false;
-    }
 
     const char* pname2 = pname + 1;
     while (*pname2 == '0')
@@ -501,7 +527,7 @@ static bool carla_priv_param_changed(void *data, obs_properties_t *props, obs_pr
         .index = pindex,
         .value = value
     };
-    struct carla_main_thread_param_change *mchangeptr = malloc(sizeof(mchange));
+    struct carla_main_thread_param_change *mchangeptr = bmalloc(sizeof(mchange));
     *mchangeptr = mchange;
     carla_qt_callback_on_main_thread(carla_main_thread_param_change, mchangeptr);
 
