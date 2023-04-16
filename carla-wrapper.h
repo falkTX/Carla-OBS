@@ -12,13 +12,8 @@
 #define PROP_SELECT_PLUGIN "select-plugin"
 #define PROP_SHOW_GUI "show-gui"
 
-// debug
-#define TRACE_CALL printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> %s %d\n", __FUNCTION__, __LINE__);
-
 // maximum buffer used, can be smaller
 #define MAX_AUDIO_BUFFER_SIZE 512
-
-struct carla_priv;
 
 enum buffer_size_mode {
     buffer_size_dynamic,
@@ -27,6 +22,8 @@ enum buffer_size_mode {
     buffer_size_static_512,
     buffer_size_static_max = buffer_size_static_512
 };
+
+struct carla_priv;
 
 // --------------------------------------------------------------------------------------------------------------------
 // carla + obs integration methods

@@ -485,6 +485,7 @@ void carla_priv_set_buffer_size(struct carla_priv *priv, enum buffer_size_mode b
 static bool carla_priv_param_changed(void *data, obs_properties_t *props, obs_property_t *property, obs_data_t *settings)
 {
     UNUSED_PARAMETER(props);
+
     struct carla_priv *priv = data;
 
     const char *const pname = obs_property_name(property);
@@ -615,8 +616,8 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
 
 bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *property, void *data)
 {
-    TRACE_CALL
     UNUSED_PARAMETER(property);
+
     struct carla_priv *priv = data;
 
     const PluginListDialogResults *plugin = carla_frontend_createAndExecPluginListDialog(carla_qt_get_main_window());
@@ -645,7 +646,6 @@ bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *
 
 bool carla_priv_show_gui_callback(obs_properties_t *props, obs_property_t *property, void *data)
 {
-    TRACE_CALL
     UNUSED_PARAMETER(props);
     UNUSED_PARAMETER(property);
 
@@ -660,7 +660,6 @@ bool carla_priv_show_gui_callback(obs_properties_t *props, obs_property_t *prope
 
     carla_show_custom_ui(priv->internalHostHandle, 0, true);
 
-    TRACE_CALL
     return false;
 }
 

@@ -112,7 +112,6 @@ static void carla_obs_destroy(void *data)
 
 static obs_properties_t *carla_obs_get_properties(void *data)
 {
-    TRACE_CALL
     struct carla_data *carla = data;
 
     obs_properties_t *props = obs_properties_create();
@@ -122,7 +121,6 @@ static obs_properties_t *carla_obs_get_properties(void *data)
 
     carla_priv_readd_properties(carla->priv, props);
 
-    TRACE_CALL
     return props;
 }
 
@@ -208,7 +206,6 @@ static struct obs_audio_data *carla_obs_filter_audio(void *data, struct obs_audi
 
 static void carla_obs_save(void *data, obs_data_t *settings)
 {
-    TRACE_CALL
     struct carla_data *carla = data;
 
     char *state = carla_priv_get_state(carla->priv);
@@ -217,23 +214,15 @@ static void carla_obs_save(void *data, obs_data_t *settings)
         obs_data_set_string(settings, "state", state);
         carla_priv_free(state);
     }
-
-    TRACE_CALL
 }
 
 static void carla_obs_load(void *data, obs_data_t *settings)
 {
-    TRACE_CALL
     struct carla_data *carla = data;
 
     const char *state = obs_data_get_string(settings, "state");
     if (state)
-    {
-        // printf("got carla state:\n%s", state);
         carla_priv_set_state(carla->priv, state);
-    }
-
-    TRACE_CALL
 }
 
 // --------------------------------------------------------------------------------------------------------------------
