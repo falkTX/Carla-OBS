@@ -26,8 +26,14 @@
 // generates a warning if this is defined as anything else
 #define CARLA_API
 
+#define CARLA_AUDIO_GEN_BUFFER_SIZE 512
+#define CARLA_MAX_PARAMS 100
+
 // --------------------------------------------------------------------------------------------------------------------
 // helper methods
+
+#define PARAM_NAME_SIZE 5
+#define PARAM_NAME_INIT {'p','0','0','0','\0'}
 
 struct carla_main_thread_param_change {
     const NativePluginDescriptor* descriptor;
@@ -43,10 +49,30 @@ static void carla_main_thread_param_change(void *data)
     free(data);
 }
 
+static void param_index_to_name(uint index, char name[PARAM_NAME_SIZE])
+{
+    name[1] = '0' + ((index / 100) % 10);
+    name[2] = '0' + ((index / 10 ) % 10);
+    name[3] = '0' + ((index / 1  ) % 10);
+}
+
+static void remove_all_props(obs_properties_t *props, obs_data_t *settings)
+{
+    obs_data_unset_default_value(settings, PROP_SHOW_GUI);
+    obs_properties_remove_by_name(props, PROP_SHOW_GUI);
+
+    char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
+
+    for (uint32_t i=0; i < CARLA_MAX_PARAMS; ++i)
+    {
+        param_index_to_name(i, pname);
+        obs_data_unset_default_value(settings, pname);
+        obs_properties_remove_by_name(props, pname);
+    }
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // private data methods
-
-#define CARLA_AUDIO_GEN_BUFFER_SIZE 512
 
 struct carla_param_data {
     uint32_t hints;
@@ -191,17 +217,18 @@ static void host_ui_parameter_changed(NativeHostHandle handle, uint32_t index, f
     const uint32_t hints = priv->paramDetails[index].hints;
     if ((hints & NATIVE_PARAMETER_IS_ENABLED) == 0)
         return;
+    if (hints & NATIVE_PARAMETER_IS_OUTPUT)
+        return;
 
-    char pname[] = {'p','0','0','0','\0'};
-    pname[1] = '0' + ((index / 100) % 10);
-    pname[2] = '0' + ((index / 10) % 10);
-    pname[3] = '0' + (index % 10);
+    char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
+    param_index_to_name(index, pname);
     printf("host_ui_parameter_changed %d:%s to %f\n", index, pname, value);
 
     // FIXME this doesnt really work
 
     obs_source_t *source = priv->source;
     obs_data_t *settings = obs_source_get_settings(source);
+    signal_handler_t *sighandler = obs_source_get_signal_handler(source);
 
     /**/ if (hints & NATIVE_PARAMETER_IS_BOOLEAN)
         obs_data_set_bool(settings, pname, value > 0.5f ? 1.f : 0.f);
@@ -420,24 +447,6 @@ void carla_priv_set_state(struct carla_priv *priv, const char *state)
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static void remove_all_props(obs_properties_t *props, obs_data_t *settings)
-{
-    obs_data_unset_default_value(settings, PROP_SHOW_GUI);
-    obs_properties_remove_by_name(props, PROP_SHOW_GUI);
-
-    char pname[] = {'p','0','0','0','\0'};
-
-    for (uint32_t i=0; i < 120; ++i)
-    {
-        pname[1] = '0' + ((i / 100) % 10);
-        pname[2] = '0' + ((i / 10) % 10);
-        pname[3] = '0' + (i % 10);
-
-        obs_data_unset_default_value(settings, pname);
-        obs_properties_remove_by_name(props, pname);
-    }
-}
-
 static bool carla_priv_param_changed(void *data, obs_properties_t *props, obs_property_t *property, obs_data_t *settings)
 {
     struct carla_priv *priv = data;
@@ -511,11 +520,14 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
                                    carla_priv_show_gui_callback, priv);
     }
 
-    const uint32_t params = priv->descriptor->get_parameter_count(priv->handle);
-    char pname[] = {'p','0','0','0','\0'};
+    uint32_t params = priv->descriptor->get_parameter_count(priv->handle);
+    if (params > CARLA_MAX_PARAMS)
+        params = CARLA_MAX_PARAMS;
 
     bfree(priv->paramDetails);
     priv->paramDetails = bzalloc(sizeof(struct carla_param_data) * params);
+
+    char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
 
     for (uint32_t i=0; i < params; ++i)
     {
@@ -526,13 +538,10 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
         if (info->hints & NATIVE_PARAMETER_IS_OUTPUT)
             break;
 
+        param_index_to_name(i, pname);
         priv->paramDetails[i].hints = info->hints;
         priv->paramDetails[i].min = info->ranges.min;
         priv->paramDetails[i].max = info->ranges.max;
-
-        pname[1] = '0' + ((i / 100) % 10);
-        pname[2] = '0' + ((i / 10) % 10);
-        pname[3] = '0' + (i % 10);
 
         obs_property_t *prop;
 
