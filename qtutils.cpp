@@ -10,7 +10,7 @@
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QFileDialog>
 
-void carla_obs_callback_on_main_thread(void (*callback)(void *param), void *param)
+void carla_qt_callback_on_main_thread(void (*callback)(void *param), void *param)
 {
     QTimer *const maintimer = new QTimer;
     maintimer->moveToThread(qApp->thread());
@@ -22,11 +22,11 @@ void carla_obs_callback_on_main_thread(void (*callback)(void *param), void *para
     QMetaObject::invokeMethod(maintimer, "start", Qt::QueuedConnection, Q_ARG(int, 0));
 }
 
-const char* carla_obs_file_dialog(bool save, bool isDir, const char *title, const char *filter)
+const char* carla_qt_file_dialog(bool save, bool isDir, const char *title, const char *filter)
 {
     static QByteArray ret;
 
-    QWidget *parent = carla_obs_get_main_window();
+    QWidget *parent = carla_qt_get_main_window();
     QFileDialog::Options options;
 
     if (isDir)
@@ -44,15 +44,15 @@ const char* carla_obs_file_dialog(bool save, bool isDir, const char *title, cons
     return ret.constData();
 }
 
-uintptr_t carla_obs_get_main_window_id(void)
+uintptr_t carla_qt_get_main_window_id(void)
 {
-    if (QMainWindow *mw = carla_obs_get_main_window())
+    if (QMainWindow *mw = carla_qt_get_main_window())
         return mw->winId();
 
     return 0;
 }
 
-QMainWindow* carla_obs_get_main_window(void)
+QMainWindow* carla_qt_get_main_window(void)
 {
     for (QWidget *w : QApplication::topLevelWidgets())
     {

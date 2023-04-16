@@ -104,16 +104,16 @@ static int carla_audio_gen_thread(void *data)
 
         if (priv->active)
         {
+            out.timestamp = now;
             priv->timeInfo.usecs = now / 1000;
             priv->descriptor->process(priv->handle, silences, bufs, CARLA_AUDIO_GEN_BUFFER_SIZE, NULL, 0);
-            out.timestamp = now;
             obs_source_output_audio(priv->source, &out);
             now = os_gettime_ns();
         }
 
         // time went backwards!
         if (now < prev) {
-            printf("________________________________________________________________________________________ backwards time\n");
+            printf("_______________________________________________________________________________ backwards time\n");
             if (++xruns == 1000)
                 break;
             continue;
@@ -123,7 +123,7 @@ static int carla_audio_gen_thread(void *data)
 
         // xrun!
         if (slice <= diff) {
-            printf("________________________________________________________________________________________ xrun | %lu %lu | %lu %lu\n",
+            printf("______________________________________________________________________ xrun | %lu %lu | %lu %lu\n",
                    slice, diff, prev, now);
             if (++xruns == 1000)
                 break;
@@ -236,13 +236,13 @@ static void host_ui_closed(NativeHostHandle handle)
 static const char* host_ui_open_file(NativeHostHandle handle, bool isDir, const char *title, const char *filter)
 {
     UNUSED_PARAMETER(handle);
-    return carla_obs_file_dialog(false, isDir, title, filter);
+    return carla_qt_file_dialog(false, isDir, title, filter);
 }
 
 static const char* host_ui_save_file(NativeHostHandle handle, bool isDir, const char *title, const char *filter)
 {
     UNUSED_PARAMETER(handle);
-    return carla_obs_file_dialog(true, isDir, title, filter);
+    return carla_qt_file_dialog(true, isDir, title, filter);
 }
 
 static intptr_t host_dispatcher(NativeHostHandle handle, NativeHostDispatcherOpcode opcode,
@@ -522,7 +522,7 @@ static bool carla_priv_param_changed(void *data, obs_properties_t *props, obs_pr
     };
     struct carla_main_thread_param_change *mchangeptr = malloc(sizeof(mchange));
     *mchangeptr = mchange;
-    carla_obs_callback_on_main_thread(carla_main_thread_param_change, mchangeptr);
+    carla_qt_callback_on_main_thread(carla_main_thread_param_change, mchangeptr);
 
     return false;
 }
@@ -615,7 +615,7 @@ bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *
     UNUSED_PARAMETER(property);
     struct carla_priv *priv = data;
 
-    const PluginListDialogResults *plugin = carla_frontend_createAndExecPluginListDialog(carla_obs_get_main_window());
+    const PluginListDialogResults *plugin = carla_frontend_createAndExecPluginListDialog(carla_qt_get_main_window());
 
     if (plugin == NULL)
         return false;
@@ -650,7 +650,7 @@ bool carla_priv_show_gui_callback(obs_properties_t *props, obs_property_t *prope
 
     // TODO open plugin list dialog
     char winIdStr[24];
-    snprintf(winIdStr, sizeof(winIdStr), "%lx", (ulong)carla_obs_get_main_window_id());
+    snprintf(winIdStr, sizeof(winIdStr), "%lx", (ulong)carla_qt_get_main_window_id());
     carla_set_engine_option(priv->internalHostHandle, ENGINE_OPTION_FRONTEND_WIN_ID, 0, winIdStr);
     // carla_set_engine_option(priv->internalHostHandle, ENGINE_OPTION_FRONTEND_UI_SCALE, scaleFactor*1000, nullptr);
 
