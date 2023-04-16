@@ -21,6 +21,7 @@ const char* carla_qt_file_dialog(bool save, bool isDir, const char *title, const
 
 uintptr_t carla_qt_get_main_window_id(void);
 QMainWindow* carla_qt_get_main_window(void);
+double carla_qt_get_scale_factor(void);
 
 #ifdef __cplusplus
 }

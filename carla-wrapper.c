@@ -420,7 +420,7 @@ void carla_priv_set_state(struct carla_priv *priv, const char *state)
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static void carla_priv_remove_all_props(obs_properties_t *props, obs_data_t *settings)
+static void remove_all_props(obs_properties_t *props, obs_data_t *settings)
 {
     obs_data_unset_default_value(settings, PROP_SHOW_GUI);
     obs_properties_remove_by_name(props, PROP_SHOW_GUI);
@@ -504,14 +504,11 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
     obs_data_t *settings = obs_source_get_settings(priv->source);
 
     // show/hide GUI button
-    const bool hasGUI = carla_get_current_plugin_count(priv->internalHostHandle) != 0 &&
-                        carla_get_plugin_info(priv->internalHostHandle, 0)->hints & PLUGIN_HAS_CUSTOM_UI;
-    if (hasGUI)
+    if (carla_get_current_plugin_count(priv->internalHostHandle) != 0 &&
+        carla_get_plugin_info(priv->internalHostHandle, 0)->hints & PLUGIN_HAS_CUSTOM_UI)
     {
-        // obs_property_t *gui = obs_properties_get(props, PROP_SHOW_GUI);
-        obs_properties_add_button2(props, PROP_SHOW_GUI, obs_module_text("Show custom GUI"), carla_priv_show_gui_callback, priv);
-        // obs_property_set_enabled(gui, hasGUI);
-        // obs_property_set_visible(gui, hasGUI);
+        obs_properties_add_button2(props, PROP_SHOW_GUI, obs_module_text("Show custom GUI"),
+                                   carla_priv_show_gui_callback, priv);
     }
 
     const uint32_t params = priv->descriptor->get_parameter_count(priv->handle);
@@ -595,7 +592,7 @@ bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *
     {
         obs_source_t *source = priv->source;
         obs_data_t *settings = obs_source_get_settings(source);
-        carla_priv_remove_all_props(props, settings);
+        remove_all_props(props, settings);
         carla_priv_readd_properties(priv, props);
         obs_data_release(settings);
         return true;
@@ -612,11 +609,12 @@ bool carla_priv_show_gui_callback(obs_properties_t *props, obs_property_t *prope
 
     struct carla_priv *priv = data;
 
-    // TODO open plugin list dialog
     char winIdStr[24];
-    snprintf(winIdStr, sizeof(winIdStr), "%lx", (ulong)carla_qt_get_main_window_id());
+    snprintf(winIdStr, sizeof(winIdStr), "%llx", (ulonglong)carla_qt_get_main_window_id());
     carla_set_engine_option(priv->internalHostHandle, ENGINE_OPTION_FRONTEND_WIN_ID, 0, winIdStr);
-    // carla_set_engine_option(priv->internalHostHandle, ENGINE_OPTION_FRONTEND_UI_SCALE, scaleFactor*1000, nullptr);
+
+    const double scaleFactor = carla_qt_get_scale_factor();
+    carla_set_engine_option(priv->internalHostHandle, ENGINE_OPTION_FRONTEND_UI_SCALE, scaleFactor*1000, NULL);
 
     carla_show_custom_ui(priv->internalHostHandle, 0, true);
 

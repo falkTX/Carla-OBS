@@ -56,3 +56,11 @@ QMainWindow* carla_qt_get_main_window(void)
 
     return nullptr;
 }
+
+double carla_qt_get_scale_factor(void)
+{
+    if (QMainWindow *mw = carla_qt_get_main_window())
+        return mw->devicePixelRatioF();;
+
+    return 1.0;
+}
