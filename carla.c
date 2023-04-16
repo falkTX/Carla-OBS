@@ -24,7 +24,6 @@ struct carla_data {
     struct carla_priv *priv;
 
     // current OBS config
-    bool isFilter;
     size_t channels;
     uint32_t sampleRate;
 
@@ -55,8 +54,6 @@ static const char *carla_obs_get_name(void *data)
 
 static void *carla_obs_create(obs_data_t *settings, obs_source_t *source, bool isFilter)
 {
-    TRACE_CALL
-
     const audio_t *audio = obs_get_audio();
     const size_t channels = audio_output_get_channels(audio);
     const uint32_t sampleRate = audio_output_get_sample_rate(audio);
@@ -81,7 +78,6 @@ static void *carla_obs_create(obs_data_t *settings, obs_source_t *source, bool i
         goto fail3;
 
     carla->priv = priv;
-    carla->isFilter = isFilter;
     carla->channels = channels;
     carla->sampleRate = sampleRate;
 
@@ -93,7 +89,7 @@ static void *carla_obs_create(obs_data_t *settings, obs_source_t *source, bool i
     return carla;
 
 fail3:
-    bfree(carla->abuffer1);
+    bfree(carla->abuffer2);
 
 fail2:
     bfree(carla->abuffer1);
@@ -115,7 +111,6 @@ static void *carla_obs_create_input(obs_data_t *settings, obs_source_t *source)
 
 static void carla_obs_destroy(void *data)
 {
-    TRACE_CALL
     struct carla_data *carla = data;
     obs_remove_tick_callback(carla_obs_idle_callback, carla);
     carla_priv_destroy(carla->priv);
