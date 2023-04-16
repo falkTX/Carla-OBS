@@ -15,6 +15,9 @@
 // debug
 #define TRACE_CALL printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> %s %d\n", __FUNCTION__, __LINE__);
 
+// maximum buffer used, can be smaller
+#define MAX_AUDIO_BUFFER_SIZE 512
+
 struct carla_priv;
 
 enum buffer_size_mode {
@@ -28,7 +31,7 @@ enum buffer_size_mode {
 // --------------------------------------------------------------------------------------------------------------------
 // carla + obs integration methods
 
-struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode bufsize, uint32_t srate);
+struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode bufsize, uint32_t srate, bool filter);
 void carla_priv_destroy(struct carla_priv *carla);
 
 void carla_priv_activate(struct carla_priv *carla);
@@ -39,6 +42,7 @@ void carla_priv_idle(struct carla_priv *carla);
 
 char *carla_priv_get_state(struct carla_priv *carla);
 void carla_priv_set_state(struct carla_priv *carla, const char *state);
+void carla_priv_set_buffer_size(struct carla_priv *priv, enum buffer_size_mode bufsize);
 
 void carla_priv_readd_properties(struct carla_priv *carla, obs_properties_t *props);
 

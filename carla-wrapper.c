@@ -23,7 +23,6 @@
 // generates a warning if this is defined as anything else
 #define CARLA_API
 
-#define CARLA_AUDIO_GEN_BUFFER_SIZE 128
 #define CARLA_MAX_PARAMS 100
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -44,6 +43,22 @@ static void carla_main_thread_param_change(void *data)
     struct carla_main_thread_param_change *priv = data;
     priv->descriptor->ui_set_parameter_value(priv->handle, priv->index, priv->value);
     bfree(data);
+}
+
+static uint32_t bufsize_mode_to_frames(enum buffer_size_mode bufsize)
+{
+    switch (bufsize)
+    {
+    case buffer_size_dynamic:
+        return MAX_AUDIO_BUFFER_SIZE;
+    case buffer_size_static_128:
+        return 128;
+    case buffer_size_static_256:
+        return 256;
+    case buffer_size_static_512:
+        return 512;
+    }
+    return 0;
 }
 
 static void param_index_to_name(uint index, char name[PARAM_NAME_SIZE])
@@ -102,36 +117,36 @@ static int carla_audio_gen_thread(void *data)
 {
     struct carla_priv *priv = data;
 
-    float silence1[CARLA_AUDIO_GEN_BUFFER_SIZE] = {0.f};
-    float silence2[CARLA_AUDIO_GEN_BUFFER_SIZE] = {0.f};
+    float silence1[MAX_AUDIO_BUFFER_SIZE] = {0.f};
+    float silence2[MAX_AUDIO_BUFFER_SIZE] = {0.f};
     float* silences[2] = {silence1,silence2};
 
-    float buf1[CARLA_AUDIO_GEN_BUFFER_SIZE] = {0.f};
-    float buf2[CARLA_AUDIO_GEN_BUFFER_SIZE] = {0.f};
+    float buf1[MAX_AUDIO_BUFFER_SIZE] = {0.f};
+    float buf2[MAX_AUDIO_BUFFER_SIZE] = {0.f};
     float* bufs[2] = {buf1,buf2};
 
     struct obs_source_audio out = {
         .data = {(uint8_t *)buf1,(uint8_t *)buf2,NULL},
-        .frames = CARLA_AUDIO_GEN_BUFFER_SIZE,
         .speakers = SPEAKERS_STEREO,
         .format = AUDIO_FORMAT_FLOAT_PLANAR,
         .samples_per_sec = priv->sampleRate,
     };
-
-    const uint64_t slice = CARLA_AUDIO_GEN_BUFFER_SIZE * 1000000000ULL / priv->sampleRate;
 
     uint64_t now, prev, diff;
     prev = now = os_gettime_ns();
 
     while (priv->audiogen_running)
     {
+        const uint64_t slice = priv->bufferSize * 1000000000ULL / priv->sampleRate;
+
         prev = now = os_gettime_ns();
 
         if (priv->activated)
         {
+            out.frames = priv->bufferSize;
             out.timestamp = now;
             priv->timeInfo.usecs = now / 1000;
-            priv->descriptor->process(priv->handle, silences, bufs, CARLA_AUDIO_GEN_BUFFER_SIZE, NULL, 0);
+            priv->descriptor->process(priv->handle, silences, bufs, out.frames, NULL, 0);
             obs_source_output_audio(priv->source, &out);
             now = os_gettime_ns();
         }
@@ -293,7 +308,7 @@ static intptr_t host_dispatcher(NativeHostHandle handle, NativeHostDispatcherOpc
 // --------------------------------------------------------------------------------------------------------------------
 // carla + obs integration methods
 
-struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode bufsize, uint32_t srate)
+struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode bufsize, uint32_t srate, bool filter)
 {
     const NativePluginDescriptor* descriptor = carla_get_native_rack_plugin();
     if (descriptor == NULL)
@@ -304,25 +319,9 @@ struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode
         return NULL;
 
     priv->source = source;
+    priv->bufferSize = bufsize_mode_to_frames(bufsize);
     priv->sampleRate = srate;
     priv->descriptor = descriptor;
-
-    switch (bufsize)
-    {
-    case buffer_size_dynamic:
-        priv->bufferSize = CARLA_AUDIO_GEN_BUFFER_SIZE;
-        priv->audiogen_running = true;
-        break;
-    case buffer_size_static_128:
-        priv->bufferSize = 128;
-        break;
-    case buffer_size_static_256:
-        priv->bufferSize = 128;
-        break;
-    case buffer_size_static_512:
-        priv->bufferSize = 128;
-        break;
-    }
 
     assert(priv->bufferSize != 0);
     if (priv->bufferSize == 0)
@@ -367,8 +366,11 @@ struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode
 
     descriptor->dispatcher(priv->handle, NATIVE_PLUGIN_OPCODE_HOST_USES_EMBED, 0, 0, NULL, 0.f);
 
-    if (priv->audiogen_running)
+    if (!filter)
+    {
+        priv->audiogen_running = true;
         thrd_create(&priv->audiogen_thread, carla_audio_gen_thread, priv);
+    }
 
     return priv;
 
@@ -453,6 +455,29 @@ char *carla_priv_get_state(struct carla_priv *priv)
 void carla_priv_set_state(struct carla_priv *priv, const char *state)
 {
     priv->descriptor->set_state(priv->handle, state);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+void carla_priv_set_buffer_size(struct carla_priv *priv, enum buffer_size_mode bufsize)
+{
+    const uint32_t new_buffer_size = bufsize_mode_to_frames(bufsize);
+    assert(new_buffer_size != 0);
+    if (new_buffer_size == 0)
+        return;
+
+    const bool activated = priv->activated;
+
+    if (activated)
+        carla_priv_deactivate(priv);
+
+    priv->bufferSize = new_buffer_size;
+    priv->descriptor->dispatcher(priv->handle,
+                                 NATIVE_PLUGIN_OPCODE_BUFFER_SIZE_CHANGED, new_buffer_size,
+                                 0, NULL, 0.f);
+
+    if (activated)
+        carla_priv_activate(priv);
 }
 
 // --------------------------------------------------------------------------------------------------------------------

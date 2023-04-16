@@ -6,9 +6,6 @@
 
 #include "carla-wrapper.h"
 
-// maximum buffer used, could be lower
-#define MAX_AUDIO_BUFFER_SIZE 512
-
 // --------------------------------------------------------------------------------------------------------------------
 
 struct carla_data {
@@ -67,7 +64,7 @@ static void *carla_obs_create(obs_data_t *settings, obs_source_t *source, bool i
     if (carla->abuffer2 == NULL)
         goto fail2;
 
-    struct carla_priv *priv = carla_priv_create(source, isFilter ? MAX_AUDIO_BUFFER_SIZE : 0, sampleRate);
+    struct carla_priv *priv = carla_priv_create(source, buffer_size_dynamic, sampleRate, isFilter);
     if (carla == NULL)
         goto fail3;
 
