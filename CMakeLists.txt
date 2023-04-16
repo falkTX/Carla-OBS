@@ -180,6 +180,7 @@ target_sources(carla_ysfx PRIVATE
 
 target_sources(carla PRIVATE
   carla.c
+  carla-wrapper.c
   qtutils.cpp
   carla/source/backend/engine/CarlaEngine.cpp
   carla/source/backend/engine/CarlaEngineClient.cpp
