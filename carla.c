@@ -54,6 +54,8 @@ static const char *carla_obs_get_name(void *data)
 
 static void *carla_obs_create(obs_data_t *settings, obs_source_t *source, bool isFilter)
 {
+    UNUSED_PARAMETER(settings);
+
     const audio_t *audio = obs_get_audio();
     const size_t channels = audio_output_get_channels(audio);
     const uint32_t sampleRate = audio_output_get_sample_rate(audio);
@@ -133,24 +135,6 @@ static obs_properties_t *carla_obs_get_properties(void *data)
 
     TRACE_CALL
     return props;
-}
-
-static void carla_obs_update(void *data, obs_data_t *settings)
-{
-    TRACE_CALL
-//     struct carla_data *carla = data;
-    // carla->isUpdating = true;
-    // const char *json = obs_data_get_json_pretty(settings);
-
-    printf("carla_obs_update called for:");
-
-    for (obs_data_item_t *item = obs_data_first(settings); item != NULL; obs_data_item_next(&item))
-    {
-         printf(" %s,", obs_data_item_get_name(item));
-    }
-
-    printf("\n");
-    TRACE_CALL
 }
 
 static void carla_obs_activate(void *data)
@@ -283,7 +267,7 @@ bool obs_module_load(void)
         .destroy = carla_obs_destroy,
         // get_width, get_height, get_defaults
         .get_properties = carla_obs_get_properties,
-        .update = carla_obs_update,
+        // update
 //         .activate = carla_obs_activate,
 //         .deactivate = carla_obs_deactivate,
         // show, hide, video_tick, video_render, filter_video
@@ -311,7 +295,7 @@ bool obs_module_load(void)
         .destroy = carla_obs_destroy,
         // get_width, get_height, get_defaults
         .get_properties = carla_obs_get_properties,
-        .update = carla_obs_update,
+        // update
 //         .activate = carla_obs_activate,
 //         .deactivate = carla_obs_deactivate,
         // show, hide, video_tick, video_render, filter_video, filter_audio, enum_active_sources
