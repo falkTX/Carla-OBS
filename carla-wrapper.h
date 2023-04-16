@@ -13,34 +13,31 @@
 #define PROP_SHOW_GUI "show-gui"
 #define PROP_RELOAD "reload"
 
-// maximum buffer used, could be lower
-#define MAX_AUDIO_BUFFER_SIZE 512
-
 // debug
 #define TRACE_CALL printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> %s %d\n", __FUNCTION__, __LINE__);
+
+struct carla_priv;
 
 // --------------------------------------------------------------------------------------------------------------------
 // carla + obs integration methods
 
-struct carla_priv;
+struct carla_priv *carla_priv_create(obs_source_t *source, uint32_t bufferSize, uint32_t sampleRate);
+void carla_priv_destroy(struct carla_priv *carla);
 
-struct carla_priv *carla_obs_alloc(obs_source_t *source, uint32_t bufferSize, uint32_t sampleRate);
-void carla_obs_dealloc(struct carla_priv *carla);
+void carla_priv_activate(struct carla_priv *carla);
+void carla_priv_deactivate(struct carla_priv *carla);
+void carla_priv_process_audio(struct carla_priv *carla, float *buffers[2], uint32_t frames);
 
-void carla_obs_activate(struct carla_priv *carla);
-void carla_obs_deactivate(struct carla_priv *carla);
-void carla_obs_process_audio(struct carla_priv *carla, float *buffers[2], uint32_t frames);
+void carla_priv_idle(struct carla_priv *carla);
 
-void carla_obs_idle(struct carla_priv *carla);
+char *carla_priv_get_state(struct carla_priv *carla);
+void carla_priv_set_state(struct carla_priv *carla, const char *state);
 
-char *carla_obs_get_state(struct carla_priv *carla);
-void carla_obs_set_state(struct carla_priv *carla, const char *state);
+void carla_priv_readd_properties(struct carla_priv *carla, obs_properties_t *props);
 
-void carla_obs_readd_properties(struct carla_priv *carla, obs_properties_t *props);
+bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *property, void *data);
+bool carla_priv_show_gui_callback(obs_properties_t *props, obs_property_t *property, void *data);
 
-bool carla_obs_select_plugin_callback(obs_properties_t *props, obs_property_t *property, void *data);
-bool carla_obs_show_gui_callback(obs_properties_t *props, obs_property_t *property, void *data);
-
-void carla_obs_free(void *data);
+void carla_priv_free(void *data);
 
 // --------------------------------------------------------------------------------------------------------------------

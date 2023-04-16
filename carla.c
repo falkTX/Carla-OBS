@@ -6,7 +6,18 @@
 
 #include "carla-wrapper.h"
 
+// maximum buffer used, could be lower
+#define MAX_AUDIO_BUFFER_SIZE 512
+
 // --------------------------------------------------------------------------------------------------------------------
+
+enum buffer_size_mode {
+    buffer_size_dynamic,
+    buffer_size_static_128,
+    buffer_size_static_256,
+    buffer_size_static_512,
+    buffer_size_static_max = buffer_size_static_512
+};
 
 struct carla_data {
     // carla host details, intentionally kept private so we can easily swap internals
@@ -18,8 +29,8 @@ struct carla_data {
     uint32_t sampleRate;
 
     // internal buffering
+    enum buffer_size_mode bufferSizeMode;
     uint32_t bufferPos;
-    uint32_t bufferSize;
     float *abuffer1, *abuffer2;
 };
 
@@ -30,7 +41,7 @@ static void carla_obs_idle_callback(void *data, float unused)
 {
     UNUSED_PARAMETER(unused);
     struct carla_data *carla = data;
-    carla_obs_idle(carla->priv);
+    carla_priv_idle(carla->priv);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -38,13 +49,11 @@ static void carla_obs_idle_callback(void *data, float unused)
 
 static const char *carla_obs_get_name(void *data)
 {
-    struct carla_data *carla = data;
-
-    return carla->isFilter ? obs_module_text("Audio Plugin Filter")
-                           : obs_module_text("Audio Plugin Input");
+    return !strcmp(data, "filter") ? obs_module_text("Audio Plugin Filter")
+                                   : obs_module_text("Audio Plugin Input");
 }
 
-static void *carla_obs_create(obs_data_t *settings, obs_source_t *source)
+static void *carla_obs_create(obs_data_t *settings, obs_source_t *source, bool isFilter)
 {
     TRACE_CALL
 
@@ -67,17 +76,17 @@ static void *carla_obs_create(obs_data_t *settings, obs_source_t *source)
     if (carla->abuffer2 == NULL)
         goto fail2;
 
-    struct carla_priv *priv = carla_obs_alloc(source, MAX_AUDIO_BUFFER_SIZE, sampleRate);
+    struct carla_priv *priv = carla_priv_create(source, isFilter ? MAX_AUDIO_BUFFER_SIZE : 0, sampleRate);
     if (carla == NULL)
         goto fail3;
 
     carla->priv = priv;
-    carla->isFilter = false;
+    carla->isFilter = isFilter;
     carla->channels = channels;
     carla->sampleRate = sampleRate;
 
     carla->bufferPos = 0;
-    carla->bufferSize = MAX_AUDIO_BUFFER_SIZE;
+    carla->bufferSizeMode = buffer_size_dynamic;
 
     obs_add_tick_callback(carla_obs_idle_callback, carla);
 
@@ -94,15 +103,41 @@ fail1:
     return NULL;
 }
 
+static void *carla_obs_create_filter(obs_data_t *settings, obs_source_t *source)
+{
+    return carla_obs_create(settings, source, true);
+}
+
+static void *carla_obs_create_input(obs_data_t *settings, obs_source_t *source)
+{
+    return carla_obs_create(settings, source, false);
+}
+
 static void carla_obs_destroy(void *data)
 {
     TRACE_CALL
     struct carla_data *carla = data;
     obs_remove_tick_callback(carla_obs_idle_callback, carla);
-    carla_obs_dealloc(carla->priv);
+    carla_priv_destroy(carla->priv);
     bfree(carla->abuffer2);
     bfree(carla->abuffer1);
     bfree(carla);
+}
+
+static obs_properties_t *carla_obs_get_properties(void *data)
+{
+    TRACE_CALL
+    struct carla_data *carla = data;
+
+    obs_properties_t *props = obs_properties_create();
+
+    obs_properties_add_button2(props, PROP_SELECT_PLUGIN, obs_module_text("Select plugin..."),
+                               carla_priv_select_plugin_callback, carla->priv);
+
+    carla_priv_readd_properties(carla->priv, props);
+
+    TRACE_CALL
+    return props;
 }
 
 static void carla_obs_update(void *data, obs_data_t *settings)
@@ -123,14 +158,46 @@ static void carla_obs_update(void *data, obs_data_t *settings)
     TRACE_CALL
 }
 
-static struct obs_audio_data *carla_obs_filter_audio(void *data, struct obs_audio_data *audio)
+static void carla_obs_activate(void *data)
 {
     struct carla_data *carla = data;
-    const uint32_t frames = audio->frames;
-    const uint32_t bufferSize = carla->bufferSize;
-    uint32_t bufferPos = carla->bufferPos;
+    carla_priv_activate(carla->priv);
+}
+
+static void carla_obs_deactivate(void *data)
+{
+    struct carla_data *carla = data;
+    carla_priv_deactivate(carla->priv);
+}
+
+static void carla_obs_filter_audio_dynamic(struct carla_data *carla, struct obs_audio_data *audio)
+{
+    float *obsbuffers[MAX_AV_PLANES];
+    {
+        for (uint32_t i=0; i<MAX_AV_PLANES; ++i)
+            obsbuffers[i] = (float *)audio->data[i];
+    }
+
+    carla_priv_process_audio(carla->priv, obsbuffers, audio->frames);
+}
+
+static void carla_obs_filter_audio_static(struct carla_data *carla, struct obs_audio_data *audio)
+{
+    const uint32_t bufferSize = carla->bufferSizeMode == buffer_size_static_128 ? 128
+                              : carla->bufferSizeMode == buffer_size_static_256 ? 256
+                              : MAX_AUDIO_BUFFER_SIZE;
+
+    /* TODO
     float *carlabuffers[2] = { carla->abuffer1, carla->abuffer2 };
-    float *obsbuffers[2] = { (float *)audio->data[0], (float *)audio->data[carla->channels >= 2 ? 1 : 0] };
+    float *obsbuffers[MAX_AV_PLANES];
+    {
+        for (uint32_t i=0; i<MAX_AV_PLANES; ++i)
+            obsbuffers[i] = (float *)audio->data[i];
+        for (uint32_t i=0; i<MAX_AV_PLANES; ++i)
+            obsbuffers[i] = (float *)audio->data[i];
+    }
+
+    uint32_t bufferPos = carla->bufferPos;
 
     for (uint32_t i=0, j; i<frames; ++i)
     {
@@ -141,7 +208,7 @@ static struct obs_audio_data *carla_obs_filter_audio(void *data, struct obs_audi
         if (bufferPos == bufferSize)
         {
             bufferPos = 0;
-            carla_obs_process_audio(carla->priv, carlabuffers, bufferSize);
+            carla_priv_process_audio(carla->priv, carlabuffers, bufferSize);
         }
 
         obsbuffers[1][i] = carlabuffers[1][j];
@@ -149,24 +216,26 @@ static struct obs_audio_data *carla_obs_filter_audio(void *data, struct obs_audi
     }
 
     carla->bufferPos = bufferPos;
-
-    return audio;
+    */
 }
 
-static obs_properties_t *carla_obs_get_properties(void *data)
+static struct obs_audio_data *carla_obs_filter_audio(void *data, struct obs_audio_data *audio)
 {
-    TRACE_CALL
     struct carla_data *carla = data;
 
-    obs_properties_t *props = obs_properties_create();
+    switch (carla->bufferSizeMode)
+    {
+    case buffer_size_dynamic:
+        carla_obs_filter_audio_dynamic(carla, audio);
+        break;
+    case buffer_size_static_128:
+    case buffer_size_static_256:
+    case buffer_size_static_512:
+        carla_obs_filter_audio_static(carla, audio);
+        break;
+    }
 
-    obs_properties_add_button2(props, PROP_SELECT_PLUGIN, obs_module_text("Select plugin..."),
-                               carla_obs_select_plugin_callback, carla->priv);
-
-    carla_obs_readd_properties(carla->priv, props);
-
-    TRACE_CALL
-    return props;
+    return audio;
 }
 
 static void carla_obs_save(void *data, obs_data_t *settings)
@@ -174,11 +243,11 @@ static void carla_obs_save(void *data, obs_data_t *settings)
     TRACE_CALL
     struct carla_data *carla = data;
 
-    char *state = carla_obs_get_state(carla->priv);
+    char *state = carla_priv_get_state(carla->priv);
     if (state)
     {
         obs_data_set_string(settings, "state", state);
-        carla_obs_free(state);
+        carla_priv_free(state);
     }
 
     TRACE_CALL
@@ -192,8 +261,8 @@ static void carla_obs_load(void *data, obs_data_t *settings)
     const char *state = obs_data_get_string(settings, "state");
     if (state)
     {
-        printf("got carla state:\n%s", state);
-        carla_obs_set_state(carla->priv, state);
+        // printf("got carla state:\n%s", state);
+        carla_priv_set_state(carla->priv, state);
     }
 
     TRACE_CALL
@@ -215,29 +284,52 @@ bool obs_module_load(void)
         .type = OBS_SOURCE_TYPE_FILTER,
         .output_flags = OBS_SOURCE_AUDIO,
         .get_name = carla_obs_get_name,
-        .create = carla_obs_create,
+        .create = carla_obs_create_filter,
         .destroy = carla_obs_destroy,
-        .update = carla_obs_update,
-        .filter_audio = carla_obs_filter_audio,
+        // get_width, get_height, get_defaults
         .get_properties = carla_obs_get_properties,
+        .update = carla_obs_update,
+//         .activate = carla_obs_activate,
+//         .deactivate = carla_obs_deactivate,
+        // show, hide, video_tick, video_render, filter_video
+        .filter_audio = carla_obs_filter_audio,
+        // enum_active_sources
         .save = carla_obs_save,
         .load = carla_obs_load,
+        // mouse_click, mouse_move, mouse_wheel, focus, key_click, filter_remove,
+        .type_data = "filter",
+        // free_type_data
+        // audio_render, enum_all_sources, transition_start, transition_stop, get_defaults2, audio_mix
+        .icon_type = OBS_ICON_TYPE_PROCESS_AUDIO_OUTPUT,
+        // media_play_pause, media_restart, media_stop, media_next, media_previous
+        // media_get_duration, media_get_time, media_set_time, media_get_state
+        // version, unversioned_id, missing_files, video_get_color_space
     };
     obs_register_source(&filter);
 
     static const struct obs_source_info input = {
         .id = "carla_input",
         .type = OBS_SOURCE_TYPE_INPUT,
-        .output_flags = OBS_SOURCE_AUDIO | OBS_SOURCE_MONITOR_BY_DEFAULT,
+        .output_flags = OBS_SOURCE_AUDIO,
         .get_name = carla_obs_get_name,
-        .create = carla_obs_create,
+        .create = carla_obs_create_input,
         .destroy = carla_obs_destroy,
-        .update = carla_obs_update,
-        .filter_audio = carla_obs_filter_audio,
+        // get_width, get_height, get_defaults
         .get_properties = carla_obs_get_properties,
+        .update = carla_obs_update,
+//         .activate = carla_obs_activate,
+//         .deactivate = carla_obs_deactivate,
+        // show, hide, video_tick, video_render, filter_video, filter_audio, enum_active_sources
         .save = carla_obs_save,
         .load = carla_obs_load,
+        // mouse_click, mouse_move, mouse_wheel, focus, key_click, filter_remove,
+        .type_data = "input",
+        // free_type_data
+        // audio_render, enum_all_sources, transition_start, transition_stop, get_defaults2, audio_mix
         .icon_type = OBS_ICON_TYPE_AUDIO_OUTPUT,
+        // media_play_pause, media_restart, media_stop, media_next, media_previous
+        // media_get_duration, media_get_time, media_set_time, media_get_state
+        // version, unversioned_id, missing_files, video_get_color_space
     };
     obs_register_source(&input);
 

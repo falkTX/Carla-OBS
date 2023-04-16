@@ -8,6 +8,12 @@
 #include "qtutils.h"
 #include <util/platform.h>
 
+// TESTING audio generator mode
+#include <threads.h>
+#include <time.h>
+#include <sys/time.h>
+#include <unistd.h>
+
 // IDE helpers, must match cmake config
 #define CARLA_PLUGIN_BUILD 1
 #define HAVE_X11 1
@@ -40,6 +46,8 @@ static void carla_main_thread_param_change(void *data)
 // --------------------------------------------------------------------------------------------------------------------
 // private data methods
 
+#define CARLA_AUDIO_GEN_BUFFER_SIZE 512
+
 struct carla_param_data {
     uint32_t hints;
     float min, max;
@@ -55,7 +63,92 @@ struct carla_priv {
     NativeTimeInfo timeInfo;
     CarlaHostHandle internalHostHandle;
     struct carla_param_data* paramDetails;
+
+    // TESTING audio generator mode
+    thrd_t thread;
+    volatile bool active;
+    volatile bool runningThread;
 };
+
+static int carla_audio_gen_thread(void *data)
+{
+    struct carla_priv *priv = data;
+
+    float silence1[CARLA_AUDIO_GEN_BUFFER_SIZE] = {0.f};
+    float silence2[CARLA_AUDIO_GEN_BUFFER_SIZE] = {0.f};
+    float* silences[2] = {silence1,silence2};
+
+    float buf1[CARLA_AUDIO_GEN_BUFFER_SIZE] = {0.f};
+    float buf2[CARLA_AUDIO_GEN_BUFFER_SIZE] = {0.f};
+    float* bufs[2] = {buf1,buf2};
+
+    struct obs_source_audio out = {};
+    out.data[0] = (uint8_t *)buf1;
+    out.data[1] = (uint8_t *)buf2;
+    for (int i=2; i<MAX_AV_PLANES; ++i)
+        out.data[i] = NULL;
+    out.frames = CARLA_AUDIO_GEN_BUFFER_SIZE;
+    out.speakers = SPEAKERS_STEREO;
+    out.format = AUDIO_FORMAT_FLOAT_PLANAR;
+    out.samples_per_sec = priv->sampleRate;
+
+    const uint64_t slice = CARLA_AUDIO_GEN_BUFFER_SIZE * 1000000000ULL / priv->sampleRate;
+
+    uint32_t xruns = 0;
+    uint64_t now, prev, diff;
+    prev = now = os_gettime_ns();
+
+    while (priv->runningThread)
+    {
+        prev = now = os_gettime_ns();
+
+        if (priv->active)
+        {
+            priv->timeInfo.usecs = now / 1000;
+            priv->descriptor->process(priv->handle, silences, bufs, CARLA_AUDIO_GEN_BUFFER_SIZE, NULL, 0);
+            out.timestamp = now;
+            obs_source_output_audio(priv->source, &out);
+            now = os_gettime_ns();
+        }
+
+        // time went backwards!
+        if (now < prev) {
+            printf("________________________________________________________________________________________ backwards time\n");
+            if (++xruns == 1000)
+                break;
+            continue;
+        }
+
+        diff = now - prev;
+
+        // xrun!
+        if (slice <= diff) {
+            printf("________________________________________________________________________________________ xrun | %lu %lu | %lu %lu\n",
+                   slice, diff, prev, now);
+            if (++xruns == 1000)
+                break;
+            continue;
+        }
+
+#if 0
+        // FIXME get this part to work
+        struct timespec nowts;
+        clock_gettime(CLOCK_REALTIME, &nowts);
+        now = nowts.tv_sec * 1000000000ULL + nowts.tv_nsec;
+
+        const uint64_t target = now + slice - diff;
+        const struct timespec timeout = {
+            target / 1000000000ULL,
+            target % 1000000000ULL
+        };
+        thrd_sleep(&timeout, NULL);
+#else
+        usleep((slice - diff) / 1000);
+#endif
+    }
+
+    return thrd_success;
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 // carla host methods
@@ -188,7 +281,7 @@ static intptr_t host_dispatcher(NativeHostHandle handle, NativeHostDispatcherOpc
 // --------------------------------------------------------------------------------------------------------------------
 // carla + obs integration methods
 
-struct carla_priv *carla_obs_alloc(obs_source_t *source, uint32_t bufferSize, uint32_t sampleRate)
+struct carla_priv *carla_priv_create(obs_source_t *source, uint32_t bufferSize, uint32_t sampleRate)
 {
     const NativePluginDescriptor* descriptor = carla_get_native_rack_plugin();
     if (descriptor == NULL)
@@ -202,6 +295,13 @@ struct carla_priv *carla_obs_alloc(obs_source_t *source, uint32_t bufferSize, ui
     priv->bufferSize = bufferSize;
     priv->sampleRate = sampleRate;
     priv->descriptor = descriptor;
+
+    if (bufferSize == 0)
+    {
+        // TESTING audio generator mode
+        priv->bufferSize = CARLA_AUDIO_GEN_BUFFER_SIZE;
+        priv->runningThread = true;
+    }
 
     {
         NativeHostDescriptor host = {
@@ -241,6 +341,15 @@ struct carla_priv *carla_obs_alloc(obs_source_t *source, uint32_t bufferSize, ui
         goto fail2;
 
     descriptor->dispatcher(priv->handle, NATIVE_PLUGIN_OPCODE_HOST_USES_EMBED, 0, 0, NULL, 0.f);
+
+    // TODO obs_source_active
+    priv->active = true;
+    priv->descriptor->activate(priv->handle);
+
+    // TESTING audio generator mode
+    if (priv->runningThread)
+        thrd_create(&priv->thread, carla_audio_gen_thread, priv);
+
     return priv;
 
 fail2:
@@ -251,8 +360,17 @@ fail1:
     return NULL;
 }
 
-void carla_obs_dealloc(struct carla_priv *priv)
+void carla_priv_destroy(struct carla_priv *priv)
 {
+    if (priv->runningThread)
+    {
+        priv->runningThread = false;
+        thrd_join(priv->thread, NULL);
+    }
+
+    if (priv->active)
+        priv->descriptor->deactivate(priv->handle);
+
     carla_host_handle_free(priv->internalHostHandle);
     priv->descriptor->cleanup(priv->handle);
     bfree(priv->paramDetails);
@@ -261,40 +379,48 @@ void carla_obs_dealloc(struct carla_priv *priv)
 
 // --------------------------------------------------------------------------------------------------------------------
 
-void carla_obs_activate(struct carla_priv *priv)
-{
-    priv->descriptor->activate(priv->handle);
-}
+// void carla_priv_activate(struct carla_priv *priv)
+// {
+//     priv->descriptor->activate(priv->handle);
+//     priv->active = true;
+// }
+//
+// void carla_priv_deactivate(struct carla_priv *priv)
+// {
+//     if (priv->runningThread)
+//     {
+//         priv->runningThread = false;
+//         thrd_join(priv->thread, NULL);
+//     }
+//
+//     priv->active = false;
+//     priv->descriptor->deactivate(priv->handle);
+// }
 
-void carla_obs_deactivate(struct carla_priv *priv)
-{
-    priv->descriptor->deactivate(priv->handle);
-}
-
-void carla_obs_process_audio(struct carla_priv *priv, float *buffers[2], uint32_t frames)
+void carla_priv_process_audio(struct carla_priv *priv, float *buffers[2], uint32_t frames)
 {
     priv->timeInfo.usecs = os_gettime_ns() * 1000;
     priv->descriptor->process(priv->handle, buffers, buffers, frames, NULL, 0);
 }
 
-void carla_obs_idle(struct carla_priv *priv)
+void carla_priv_idle(struct carla_priv *priv)
 {
     priv->descriptor->ui_idle(priv->handle);
 }
 
-char *carla_obs_get_state(struct carla_priv *priv)
+char *carla_priv_get_state(struct carla_priv *priv)
 {
     return priv->descriptor->get_state(priv->handle);
 }
 
-void carla_obs_set_state(struct carla_priv *priv, const char *state)
+void carla_priv_set_state(struct carla_priv *priv, const char *state)
 {
     priv->descriptor->set_state(priv->handle, state);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static bool carla_obs_param_changed(void *data, obs_properties_t *props, obs_property_t *property, obs_data_t *settings)
+static bool carla_priv_param_changed(void *data, obs_properties_t *props, obs_property_t *property, obs_data_t *settings)
 {
     struct carla_priv *priv = data;
 
@@ -305,16 +431,30 @@ static bool carla_obs_param_changed(void *data, obs_properties_t *props, obs_pro
         return false;
     }
 
-    printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> %s %d | %s\n", __FUNCTION__, __LINE__, pname);
-
     if (!strcmp(pname, PROP_RELOAD))
     {
+        printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> %s %d | %s\n", __FUNCTION__, __LINE__, pname);
+
+        printf("carla_priv_param_changed has props:");
+        for (obs_property_t *prop = obs_properties_first(props); prop != NULL; obs_property_next(&prop))
+        {
+            printf(" %s,", obs_property_name(prop));
+        }
+        printf("\n");
+
+        printf("carla_priv_param_changed has settings:");
+        for (obs_data_item_t *item = obs_data_first(settings); item != NULL; obs_data_item_next(&item))
+        {
+            printf(" %s,", obs_data_item_get_name(item));
+        }
+        printf("\n");
+
         // dont reload again
         if (obs_data_get_int(settings, pname) == 0)
             return false;
         obs_data_set_int(settings, PROP_RELOAD, 0);
 
-        printf("carla_obs_param_changed needsReload\n");
+        printf("carla_priv_param_changed needsReload\n");
 
         char pname[] = {'p','0','0','0','\0'};
 
@@ -334,24 +474,9 @@ static bool carla_obs_param_changed(void *data, obs_properties_t *props, obs_pro
             obs_properties_remove_by_name(props, pname);
         }
 
-        carla_obs_readd_properties(priv, props);
+        carla_priv_readd_properties(priv, props);
         return true;
     }
-
-    printf("carla_obs_param_changed has props:");
-    for (obs_property_t *prop = obs_properties_first(props); prop != NULL; obs_property_next(&prop))
-    {
-         printf(" %s,", obs_property_name(prop));
-    }
-    printf("\n");
-
-    printf("carla_obs_param_changed has settings:");
-    for (obs_data_item_t *item = obs_data_first(settings); item != NULL; obs_data_item_next(&item))
-    {
-         printf(" %s,", obs_data_item_get_name(item));
-    }
-    printf("\n");
-
     const char* pname2 = pname + 1;
     while (*pname2 == '0')
         ++pname2;
@@ -385,7 +510,7 @@ static bool carla_obs_param_changed(void *data, obs_properties_t *props, obs_pro
         return false;
     }
 
-    printf("param changed %d:%s %f\n", pindex, pname, value);
+    // printf("param changed %d:%s %f\n", pindex, pname, value);
     priv->descriptor->set_parameter_value(priv->handle, pindex, value);
 
     // UI param change notification needs to happen on main thread
@@ -402,7 +527,7 @@ static bool carla_obs_param_changed(void *data, obs_properties_t *props, obs_pro
     return false;
 }
 
-void carla_obs_readd_properties(struct carla_priv *priv, obs_properties_t *props)
+void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *props)
 {
     obs_data_t *settings = obs_source_get_settings(priv->source);
 
@@ -412,7 +537,7 @@ void carla_obs_readd_properties(struct carla_priv *priv, obs_properties_t *props
     if (hasGUI)
     {
         // obs_property_t *gui = obs_properties_get(props, PROP_SHOW_GUI);
-        obs_properties_add_button2(props, PROP_SHOW_GUI, obs_module_text("Show custom GUI"), carla_obs_show_gui_callback, priv);
+        obs_properties_add_button2(props, PROP_SHOW_GUI, obs_module_text("Show custom GUI"), carla_priv_show_gui_callback, priv);
         // obs_property_set_enabled(gui, hasGUI);
         // obs_property_set_visible(gui, hasGUI);
     }
@@ -421,7 +546,7 @@ void carla_obs_readd_properties(struct carla_priv *priv, obs_properties_t *props
     {
         obs_property_t *reload = obs_properties_add_int_slider(props, PROP_RELOAD, obs_module_text("Needs Reload"), 0, 1, 1);
         obs_data_set_default_int(settings, PROP_RELOAD, 0);
-        obs_property_set_modified_callback2(reload, carla_obs_param_changed, priv);
+        obs_property_set_modified_callback2(reload, carla_priv_param_changed, priv);
         obs_property_set_visible(reload, false);
     }
 
@@ -476,7 +601,7 @@ void carla_obs_readd_properties(struct carla_priv *priv, obs_properties_t *props
                 obs_property_float_set_suffix(prop, info->unit);
         }
 
-        obs_property_set_modified_callback2(prop, carla_obs_param_changed, priv);
+        obs_property_set_modified_callback2(prop, carla_priv_param_changed, priv);
     }
 
     obs_data_release(settings);
@@ -484,7 +609,7 @@ void carla_obs_readd_properties(struct carla_priv *priv, obs_properties_t *props
 
 // --------------------------------------------------------------------------------------------------------------------
 
-bool carla_obs_select_plugin_callback(obs_properties_t *props, obs_property_t *property, void *data)
+bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *property, void *data)
 {
     TRACE_CALL
     UNUSED_PARAMETER(property);
@@ -503,21 +628,19 @@ bool carla_obs_select_plugin_callback(obs_properties_t *props, obs_property_t *p
                          plugin->filename, plugin->name, plugin->label, plugin->uniqueId,
                          NULL, PLUGIN_OPTIONS_NULL))
     {
-        // return true;
+        obs_source_t *source = source;
+        obs_data_t *settings = obs_source_get_settings(source);
+        obs_data_set_int(settings, PROP_RELOAD, 1);
+        obs_properties_apply_settings(props, settings);
+        obs_data_release(settings);
+        return true;
     }
-
-    // TESTING: always refresh properties at this point, useful for testing
-    obs_source_t *source = source;
-    obs_data_t *settings = obs_source_get_settings(source);
-    obs_data_set_int(settings, PROP_RELOAD, 1);
-    obs_properties_apply_settings(props, settings);
-    obs_data_release(settings);
 
     TRACE_CALL
     return false;
 }
 
-bool carla_obs_show_gui_callback(obs_properties_t *props, obs_property_t *property, void *data)
+bool carla_priv_show_gui_callback(obs_properties_t *props, obs_property_t *property, void *data)
 {
     TRACE_CALL
     UNUSED_PARAMETER(props);
@@ -539,7 +662,7 @@ bool carla_obs_show_gui_callback(obs_properties_t *props, obs_property_t *proper
 
 // --------------------------------------------------------------------------------------------------------------------
 
-void carla_obs_free(void *data)
+void carla_priv_free(void *data)
 {
     free(data);
 }
