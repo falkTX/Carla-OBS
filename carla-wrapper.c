@@ -100,6 +100,9 @@ struct carla_priv {
     NativeHostDescriptor host;
     NativeTimeInfo timeInfo;
     CarlaHostHandle internalHostHandle;
+
+    // cached parameter info
+    uint32_t paramCount;
     struct carla_param_data* paramDetails;
 
     // update properties when timeout is reached, 0 means do nothing
@@ -209,6 +212,9 @@ static bool host_write_midi_event(NativeHostHandle handle, const NativeMidiEvent
 static void host_ui_parameter_changed(NativeHostHandle handle, uint32_t index, float value)
 {
     struct carla_priv *priv = handle;
+
+    if (index >= priv->paramCount)
+        return;
 
     // skip parameters that we do not show
     const uint32_t hints = priv->paramDetails[index].hints;
@@ -502,6 +508,9 @@ static bool carla_priv_param_changed(void *data, obs_properties_t *props, obs_pr
 
     const int pindex = atoi(pname2);
 
+    if (pindex < 0 || pindex >= (int)priv->paramCount)
+        return false;
+
     const float min = priv->paramDetails[pindex].min;
     const float max = priv->paramDetails[pindex].max;
 
@@ -563,6 +572,7 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
         params = CARLA_MAX_PARAMS;
 
     bfree(priv->paramDetails);
+    priv->paramCount = params;
     priv->paramDetails = bzalloc(sizeof(struct carla_param_data) * params);
 
     char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
@@ -625,6 +635,33 @@ static bool carla_post_load_callback(struct carla_priv *priv, obs_properties_t *
     remove_all_props(props, settings);
     carla_priv_readd_properties(priv, props);
     obs_data_release(settings);
+
+    /* FIXME force OBS to have correct initial values if old plugin was loaded */
+#if 0
+    obs_data_t *settings2 = obs_source_get_settings(source);
+    char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
+
+    for (uint32_t i=0; i < priv->paramCount; ++i)
+    {
+        const uint32_t hints = priv->paramDetails[i].hints;
+
+        if ((hints & NATIVE_PARAMETER_IS_ENABLED) == 0)
+            continue;
+        if (hints & NATIVE_PARAMETER_IS_OUTPUT)
+            break;
+
+        const float value = priv->descriptor->get_parameter_value(priv->handle, i);
+
+        /**/ if (hints & NATIVE_PARAMETER_IS_BOOLEAN)
+            obs_data_set_bool(settings2, pname, value > 0.5f ? 1.f : 0.f);
+        else if (hints & NATIVE_PARAMETER_IS_INTEGER)
+            obs_data_set_int(settings2, pname, value);
+        else
+            obs_data_set_double(settings2, pname, value);
+    }
+    obs_data_release(settings2);
+#endif
+
     return true;
 }
 
