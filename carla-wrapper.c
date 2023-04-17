@@ -223,8 +223,6 @@ static void host_ui_parameter_changed(NativeHostHandle handle, uint32_t index, f
     if (hints & NATIVE_PARAMETER_IS_OUTPUT)
         return;
 
-#if 0
-    // NOTE this doesnt really work, OBS UI is not updated
     char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
     param_index_to_name(index, pname);
 
@@ -239,9 +237,6 @@ static void host_ui_parameter_changed(NativeHostHandle handle, uint32_t index, f
         obs_data_set_double(settings, pname, value);
 
     obs_data_release(settings);
-#else
-    UNUSED_PARAMETER(value);
-#endif
 
     priv->update_requested = os_gettime_ns();
 }
@@ -375,6 +370,7 @@ struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode
     // TODO build and setup local bridges
     carla_set_engine_option(priv->internalHostHandle, ENGINE_OPTION_PATH_BINARIES, 0, "/usr/lib/carla");
     carla_set_engine_option(priv->internalHostHandle, ENGINE_OPTION_PATH_RESOURCES, 0, "/usr/share/carla");
+    carla_set_engine_option(priv->internalHostHandle, ENGINE_OPTION_PREFER_PLUGIN_BRIDGES, 1, NULL);
 
     if (!filter)
     {
@@ -584,7 +580,7 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
         if ((info->hints & NATIVE_PARAMETER_IS_ENABLED) == 0)
             continue;
         if (info->hints & NATIVE_PARAMETER_IS_OUTPUT)
-            break;
+            continue;
 
         param_index_to_name(i, pname);
         priv->paramDetails[i].hints = info->hints;
@@ -679,8 +675,6 @@ bool carla_priv_load_file_callback(obs_properties_t *props, obs_property_t *prop
     if (carla_get_current_plugin_count(priv->internalHostHandle) != 0)
         carla_replace_plugin(priv->internalHostHandle, 0);
 
-    carla_set_engine_option(priv->internalHostHandle, ENGINE_OPTION_PREFER_PLUGIN_BRIDGES, 1, NULL);
-
     if (carla_load_file(priv->internalHostHandle, filename))
         return carla_post_load_callback(priv, props);
 
@@ -700,8 +694,6 @@ bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *
 
     if (carla_get_current_plugin_count(priv->internalHostHandle) != 0)
         carla_replace_plugin(priv->internalHostHandle, 0);
-
-    carla_set_engine_option(priv->internalHostHandle, ENGINE_OPTION_PREFER_PLUGIN_BRIDGES, 1, NULL);
 
     if (carla_add_plugin(priv->internalHostHandle,
                          plugin->build, plugin->type,
