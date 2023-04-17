@@ -122,7 +122,7 @@ static obs_properties_t *carla_obs_get_properties(void *data)
     obs_properties_add_button2(props, PROP_LOAD_FILE, obs_module_text("Load file..."),
                                carla_priv_load_file_callback, carla->priv);
 
-    carla_priv_readd_properties(carla->priv, props);
+    carla_priv_readd_properties(carla->priv, props, false);
 
     return props;
 }

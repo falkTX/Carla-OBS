@@ -42,7 +42,7 @@ char *carla_priv_get_state(struct carla_priv *carla);
 void carla_priv_set_state(struct carla_priv *carla, const char *state);
 void carla_priv_set_buffer_size(struct carla_priv *priv, enum buffer_size_mode bufsize);
 
-void carla_priv_readd_properties(struct carla_priv *carla, obs_properties_t *props);
+void carla_priv_readd_properties(struct carla_priv *carla, obs_properties_t *props, bool reset);
 
 bool carla_priv_load_file_callback(obs_properties_t *props, obs_property_t *property, void *data);
 bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *property, void *data);

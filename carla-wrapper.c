@@ -551,7 +551,7 @@ static bool carla_priv_param_changed(void *data, obs_properties_t *props, obs_pr
     return false;
 }
 
-void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *props)
+void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *props, bool reset)
 {
     obs_data_t *settings = obs_source_get_settings(priv->source);
 
@@ -594,6 +594,9 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
             prop = obs_properties_add_bool(props, pname, info->name);
 
             obs_data_set_default_bool(settings, pname, info->ranges.def == info->ranges.max);
+
+            if (reset)
+                obs_data_set_bool(settings, pname, info->ranges.def == info->ranges.max);
         }
         else if (info->hints & NATIVE_PARAMETER_IS_INTEGER)
         {
@@ -604,6 +607,9 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
 
             if (info->unit && *info->unit)
                 obs_property_int_set_suffix(prop, info->unit);
+
+            if (reset)
+                obs_data_set_int(settings, pname, info->ranges.def);
         }
         else
         {
@@ -614,6 +620,9 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
 
             if (info->unit && *info->unit)
                 obs_property_float_set_suffix(prop, info->unit);
+
+            if (reset)
+                obs_data_set_double(settings, pname, info->ranges.def);
         }
 
         obs_property_set_modified_callback2(prop, carla_priv_param_changed, priv);
@@ -629,35 +638,8 @@ static bool carla_post_load_callback(struct carla_priv *priv, obs_properties_t *
     obs_source_t *source = priv->source;
     obs_data_t *settings = obs_source_get_settings(source);
     remove_all_props(props, settings);
-    carla_priv_readd_properties(priv, props);
+    carla_priv_readd_properties(priv, props, true);
     obs_data_release(settings);
-
-    /* FIXME force OBS to have correct initial values if old plugin was loaded */
-#if 0
-    obs_data_t *settings2 = obs_source_get_settings(source);
-    char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
-
-    for (uint32_t i=0; i < priv->paramCount; ++i)
-    {
-        const uint32_t hints = priv->paramDetails[i].hints;
-
-        if ((hints & NATIVE_PARAMETER_IS_ENABLED) == 0)
-            continue;
-        if (hints & NATIVE_PARAMETER_IS_OUTPUT)
-            break;
-
-        const float value = priv->descriptor->get_parameter_value(priv->handle, i);
-
-        /**/ if (hints & NATIVE_PARAMETER_IS_BOOLEAN)
-            obs_data_set_bool(settings2, pname, value > 0.5f ? 1.f : 0.f);
-        else if (hints & NATIVE_PARAMETER_IS_INTEGER)
-            obs_data_set_int(settings2, pname, value);
-        else
-            obs_data_set_double(settings2, pname, value);
-    }
-    obs_data_release(settings2);
-#endif
-
     return true;
 }
 
