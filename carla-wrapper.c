@@ -366,6 +366,10 @@ struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode
 
     descriptor->dispatcher(priv->handle, NATIVE_PLUGIN_OPCODE_HOST_USES_EMBED, 0, 0, NULL, 0.f);
 
+    // TODO build and setup local bridges
+    carla_set_engine_option(priv->internalHostHandle, ENGINE_OPTION_PATH_BINARIES, 0, "/usr/lib/carla");
+    carla_set_engine_option(priv->internalHostHandle, ENGINE_OPTION_PATH_RESOURCES, 0, "/usr/share/carla");
+
     if (!filter)
     {
         priv->audiogen_running = true;
@@ -638,6 +642,8 @@ bool carla_priv_load_file_callback(obs_properties_t *props, obs_property_t *prop
     if (carla_get_current_plugin_count(priv->internalHostHandle) != 0)
         carla_replace_plugin(priv->internalHostHandle, 0);
 
+    carla_set_engine_option(priv->internalHostHandle, ENGINE_OPTION_PREFER_PLUGIN_BRIDGES, 1, NULL);
+
     if (carla_load_file(priv->internalHostHandle, filename))
         return carla_post_load_callback(priv, props);
 
@@ -657,6 +663,8 @@ bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *
 
     if (carla_get_current_plugin_count(priv->internalHostHandle) != 0)
         carla_replace_plugin(priv->internalHostHandle, 0);
+
+    carla_set_engine_option(priv->internalHostHandle, ENGINE_OPTION_PREFER_PLUGIN_BRIDGES, 1, NULL);
 
     if (carla_add_plugin(priv->internalHostHandle,
                          plugin->build, plugin->type,

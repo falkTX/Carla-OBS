@@ -38,6 +38,7 @@ target_compile_definitions(carla PRIVATE
 
 target_compile_options(carla PRIVATE
   -Wno-error
+  -Wno-vla
 )
 
 target_include_directories(carla PRIVATE
