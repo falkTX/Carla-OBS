@@ -2,5 +2,6 @@
 ./carla/source/backend/
 ./carla/source/includes/
 ./carla/source/frontend/
+./carla/source/modules/
 ./carla/source/utils/
 /usr/include/x86_64-linux-gnu/qt6

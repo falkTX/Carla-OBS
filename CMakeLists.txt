@@ -16,7 +16,7 @@ target_compile_definitions(carla PRIVATE
   CARLA_BACKEND_NAMESPACE=CarlaOBS
   #CARLA_ENGINE_WITHOUT_UI
   #CARLA_LIB_EXT=".so"
-  #CARLA_PLUGIN_BUILD
+  STATIC_PLUGIN_TARGET
   REAL_BUILD
   $<${LIBMAGIC_FOUND}:HAVE_LIBMAGIC>
 )
@@ -43,80 +43,9 @@ target_link_options(carla PRIVATE
 )
 
 ###############################################################################
-# lilv
 
-add_library(carla_lilv_1 STATIC)
-add_library(carla_lilv_2 STATIC)
-add_library(carla_lilv_3 STATIC)
-add_library(carla_lilv_4 STATIC)
-
-add_library(carla_lilv INTERFACE)
+include(carla-lilv/CMakeLists.txt)
 add_library(OBS::carla_lilv ALIAS carla_lilv)
-
-target_link_libraries(carla_lilv INTERFACE carla_lilv_1 carla_lilv_2 carla_lilv_3 carla_lilv_4)
-
-target_compile_options(carla_lilv_1 PRIVATE
-  -fPIC
-  -Wno-error
-)
-
-target_include_directories(carla_lilv_1 PRIVATE
-  carla/source/includes
-  carla/source/modules/lilv/config
-  carla/source/modules/lilv/lilv-0.24.0
-  carla/source/modules/lilv/lilv-0.24.0/src
-)
-
-target_sources(carla_lilv_1 PRIVATE
-  carla/source/modules/lilv/lilv.c
-)
-
-target_compile_options(carla_lilv_2 PRIVATE
-  -fPIC
-  -Wno-error
-)
-
-target_include_directories(carla_lilv_2 PRIVATE
-  carla/source/modules/lilv/config
-  carla/source/modules/lilv/serd-0.24.0
-  carla/source/modules/lilv/serd-0.24.0/src
-)
-
-target_sources(carla_lilv_2 PRIVATE
-  carla/source/modules/lilv/serd.c
-)
-
-target_compile_options(carla_lilv_3 PRIVATE
-  -fPIC
-  -Wno-error
-)
-
-target_include_directories(carla_lilv_3 PRIVATE
-  carla/source/includes
-  carla/source/modules/lilv/config
-  carla/source/modules/lilv/sord-0.16.0
-  carla/source/modules/lilv/sord-0.16.0/src
-)
-
-target_sources(carla_lilv_3 PRIVATE
-  carla/source/modules/lilv/sord.c
-)
-
-target_compile_options(carla_lilv_4 PRIVATE
-  -fPIC
-  -Wno-error
-)
-
-target_include_directories(carla_lilv_4 PRIVATE
-  carla/source/includes
-  carla/source/modules/lilv/config
-  carla/source/modules/lilv/sratom-0.6.0
-  carla/source/modules/lilv/sratom-0.6.0/src
-)
-
-target_sources(carla_lilv_4 PRIVATE
-  carla/source/modules/lilv/sratom.c
-)
 
 ###############################################################################
 
