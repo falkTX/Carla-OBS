@@ -211,6 +211,9 @@ struct carla_priv {
     uint32_t paramCount;
     struct carla_param_data* paramDetails = nullptr;
 
+    // update properties when timeout is reached, 0 means do nothing
+    uint64_t update_requested;
+
     CarlaString             fBridgeBinary;
     CarlaPluginBridgeThread fBridgeThread;
 
@@ -410,7 +413,7 @@ struct carla_priv {
         {
             const PluginBridgeNonRtServerOpcode opcode(bridge.nonRtServerCtrl.readOpcode());
 // #ifdef DEBUG
-            if (opcode != kPluginBridgeNonRtServerPong /*&& opcode != kPluginBridgeNonRtServerParameterValue2*/) {
+            if (opcode != kPluginBridgeNonRtServerPong && opcode != kPluginBridgeNonRtServerParameterValue2) {
                 carla_stdout("CarlaPluginBridge::handleNonRtData() - got opcode: %s", PluginBridgeNonRtServerOpcode2str(opcode));
             }
 // #endif
@@ -637,13 +640,33 @@ struct carla_priv {
 
                 if (index < paramCount)
                 {
-//                     const float fixedValue(pData->param.getFixedValue(index, value));
-//
-//                     if (carla_isNotEqual(fParams[index].value, fixedValue))
-//                     {
-//                         fParams[index].value = fixedValue;
-//                         CarlaPlugin::setParameterValue(index, fixedValue, false, true, true);
-//                     }
+                    const float fixedValue = carla_fixedValue(paramDetails[index].min, paramDetails[index].max, value);
+
+                    if (carla_isNotEqual(paramDetails[index].value, fixedValue))
+                    {
+                        paramDetails[index].value = fixedValue;
+
+                        // skip parameters that we do not show
+                        if ((paramDetails[index].hints & PARAMETER_IS_ENABLED) == 0)
+                            break;
+
+                        char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
+                        param_index_to_name(index, pname);
+
+                        // obs_source_t *source = priv->source;
+                        obs_data_t *settings = obs_source_get_settings(source);
+
+                        /**/ if (paramDetails[index].hints & PARAMETER_IS_BOOLEAN)
+                            obs_data_set_bool(settings, pname, value > 0.5f ? 1.f : 0.f);
+                        else if (paramDetails[index].hints & PARAMETER_IS_INTEGER)
+                            obs_data_set_int(settings, pname, value);
+                        else
+                            obs_data_set_double(settings, pname, value);
+
+                        obs_data_release(settings);
+
+                        update_requested = os_gettime_ns();
+                    }
                 }
             }   break;
 
@@ -654,8 +677,8 @@ struct carla_priv {
 
                 if (index < paramCount)
                 {
-//                     const float fixedValue(pData->param.getFixedValue(index, value));
-//                     fParams[index].value = fixedValue;
+                    const float fixedValue = carla_fixedValue(paramDetails[index].min, paramDetails[index].max, value);
+                    paramDetails[index].value = fixedValue;
                 }
             }   break;
 
@@ -670,8 +693,8 @@ struct carla_priv {
                 const uint32_t index = bridge.nonRtServerCtrl.readUInt();
                 const float    value = bridge.nonRtServerCtrl.readFloat();
 
-//                 if (index < pData->param.count)
-//                     pData->param.ranges[index].def = value;
+                if (index < paramCount)
+                    paramDetails[index].def = value;
             }   break;
 
             case kPluginBridgeNonRtServerCurrentProgram: {
@@ -912,8 +935,6 @@ struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode
     if (priv->bufferSize == 0)
         goto fail1;
 
-    priv->bridge.init(priv->bufferSize, srate);
-
     return priv;
 
 fail1:
@@ -1022,6 +1043,26 @@ void carla_priv_idle(struct carla_priv *priv)
         priv->loaded  = false;
 //         handleProcessStopped();
     }
+
+    if (priv->update_requested != 0)
+    {
+        const uint64_t now = os_gettime_ns();
+
+        // request in the future?
+        if (now < priv->update_requested)
+        {
+            priv->update_requested = now;
+            return;
+        }
+
+        if (now - priv->update_requested >= 100000000ULL) // 100ms
+        {
+            priv->update_requested = 0;
+
+            signal_handler_t *sighandler = obs_source_get_signal_handler(priv->source);
+            signal_handler_signal(sighandler, "update_properties", NULL);
+        }
+    }
 }
 
 char *carla_priv_get_state(struct carla_priv *priv)
@@ -1129,21 +1170,17 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
         if ((param.hints & PARAMETER_IS_ENABLED) == 0)
             continue;
 
-        param_index_to_name(i, pname);
-        priv->paramDetails[i].hints = param.hints;
-        priv->paramDetails[i].min = param.min;
-        priv->paramDetails[i].max = param.max;
-
         obs_property_t *prop;
+        param_index_to_name(i, pname);
 
         if (param.hints & PARAMETER_IS_BOOLEAN)
         {
             prop = obs_properties_add_bool(props, pname, param.name);
 
-            obs_data_set_default_bool(settings, pname, param.def == param.max);
+            obs_data_set_default_bool(settings, pname, carla_isEqual(param.def, param.max));
 
             if (reset)
-                obs_data_set_bool(settings, pname, param.def == param.max);
+                obs_data_set_bool(settings, pname, carla_isEqual(param.value, param.max));
         }
         else if (param.hints & PARAMETER_IS_INTEGER)
         {
@@ -1152,11 +1189,11 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
 
             obs_data_set_default_int(settings, pname, param.def);
 
-            if (param.unit && *param.unit)
+            if (param.unit.isNotEmpty())
                 obs_property_int_set_suffix(prop, param.unit);
 
             if (reset)
-                obs_data_set_int(settings, pname, param.def);
+                obs_data_set_int(settings, pname, param.value);
         }
         else
         {
@@ -1165,11 +1202,11 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
 
             obs_data_set_default_double(settings, pname, param.def);
 
-            if (param.unit && *param.unit)
+            if (param.unit.isNotEmpty())
                 obs_property_float_set_suffix(prop, param.unit);
 
             if (reset)
-                obs_data_set_double(settings, pname, param.def);
+                obs_data_set_double(settings, pname, param.value);
         }
 
         obs_property_set_modified_callback2(prop, carla_priv_param_changed, priv);
@@ -1214,6 +1251,23 @@ bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *
     if (plugin == NULL)
         return false;
 
+    if (priv->fBridgeThread.isThreadRunning())
+    {
+        priv->bridge.nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientQuit);
+        priv->bridge.nonRtClientCtrl.commitWrite();
+
+        priv->bridge.rtClientCtrl.writeOpcode(kPluginBridgeRtClientQuit);
+        priv->bridge.rtClientCtrl.commitWrite();
+
+//         if (! fTimedOut)
+            priv->waitForClient("stopping", 3000);
+
+        priv->fBridgeThread.stopThread(3000);
+    }
+
+    priv->bridge.cleanup();
+    priv->bridge.init(priv->bufferSize, priv->sampleRate);
+
     {
         char shmIdsStr[6*4+1];
         carla_zeroChars(shmIdsStr, 6*4+1);
@@ -1231,6 +1285,8 @@ bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *
                                     plugin->uniqueId,
                                     shmIdsStr);
     }
+
+    priv->loaded = false;
 
     priv->fBridgeThread.startThread();
 
