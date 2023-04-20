@@ -33,21 +33,6 @@ CARLA_BACKEND_USE_NAMESPACE
 
 // ---------------------------------------------------------------------------------------------------------------------
 
-struct BridgeParamInfo {
-    float value;
-    CarlaString name;
-    CarlaString symbol;
-    CarlaString unit;
-
-    BridgeParamInfo() noexcept
-        : value(0.0f),
-          name(),
-          symbol(),
-          unit() {}
-
-    CARLA_DECLARE_NON_COPYABLE(BridgeParamInfo)
-};
-
 class CarlaPluginBridgeThread : public CarlaThread
 {
 public:
@@ -205,8 +190,15 @@ private:
 // private data methods
 
 struct carla_param_data {
-    uint32_t hints;
-    float min, max;
+    uint32_t hints = 0;
+    float value = 0.f;
+    float def = 0.f;
+    float min = 0.f;
+    float max = 1.f;
+    float step = 0.01f;
+    CarlaString name;
+    CarlaString symbol;
+    CarlaString unit;
 };
 
 struct carla_priv {
@@ -215,8 +207,17 @@ struct carla_priv {
     double sampleRate;
     bool loaded = false;
 
+    // cached parameter info
+    uint32_t paramCount;
+    struct carla_param_data* paramDetails = nullptr;
+
     CarlaString             fBridgeBinary;
     CarlaPluginBridgeThread fBridgeThread;
+
+    ~carla_priv()
+    {
+        delete[] paramDetails;
+    }
 
     struct {
         BridgeAudioPool          audiopool; // fShmAudioPool
@@ -477,13 +478,10 @@ struct carla_priv {
                 carla_zeroChars(copyright, copyrightSize+1);
                 bridge.nonRtServerCtrl.readCustomData(copyright, copyrightSize);
 
-//                 fInfo.name  = realName;
-//                 fInfo.label = label;
-//                 fInfo.maker = maker;
-//                 fInfo.copyright = copyright;
-
-//                 if (pData->name == nullptr)
-//                     pData->name = pData->engine->getUniquePluginName(realName);
+                fInfo.name  = realName;
+                fInfo.label = label;
+                fInfo.maker = maker;
+                fInfo.copyright = copyright;
             }   break;
 
             case kPluginBridgeNonRtServerAudioCount: {
@@ -521,79 +519,37 @@ struct carla_priv {
 
             case kPluginBridgeNonRtServerParameterCount: {
                 // uint/count
-                const uint32_t count = bridge.nonRtServerCtrl.readUInt();
+                paramCount = bridge.nonRtServerCtrl.readUInt();
 
-                // delete old data
-//                 pData->param.clear();
-//
-//                 if (fParams != nullptr)
-//                 {
-//                     delete[] fParams;
-//                     fParams = nullptr;
-//                 }
-//
-//                 if (count > 0)
-//                 {
-//                     pData->param.createNew(count, false);
-//                     fParams = new BridgeParamInfo[count];
-//
-//                     // we might not receive all parameter data, so ensure range max is not 0
-//                     for (uint32_t i=0; i<count; ++i)
-//                     {
-//                         pData->param.ranges[i].def = 0.0f;
-//                         pData->param.ranges[i].min = 0.0f;
-//                         pData->param.ranges[i].max = 1.0f;
-//                         pData->param.ranges[i].step = 0.001f;
-//                         pData->param.ranges[i].stepSmall = 0.0001f;
-//                         pData->param.ranges[i].stepLarge = 0.1f;
-//                     }
-//                 }
+                delete[] paramDetails;
+
+                if (paramCount != 0)
+                    paramDetails = new carla_param_data[paramCount];
+                else
+                    paramDetails = nullptr;
+
             }   break;
 
             case kPluginBridgeNonRtServerProgramCount: {
                 // uint/count
-//                 pData->prog.clear();
-
-                if (const uint32_t count = bridge.nonRtServerCtrl.readUInt())
-                {}
-//                     pData->prog.createNew(count);
-
+                bridge.nonRtServerCtrl.readUInt();
             }   break;
 
             case kPluginBridgeNonRtServerMidiProgramCount: {
                 // uint/count
-//                 pData->midiprog.clear();
-
-                if (const uint32_t count = bridge.nonRtServerCtrl.readUInt())
-                {}
-//                     pData->midiprog.createNew(count);
-
+                bridge.nonRtServerCtrl.readUInt();
             }   break;
 
             case kPluginBridgeNonRtServerPortName: {
                 // byte/type, uint/index, uint/size, str[] (name)
-                const uint8_t  portType = bridge.nonRtServerCtrl.readByte();
-                const uint32_t index    = bridge.nonRtServerCtrl.readUInt();
+                bridge.nonRtServerCtrl.readByte();
+                bridge.nonRtServerCtrl.readUInt();
 
                 // name
                 const uint32_t nameSize(bridge.nonRtServerCtrl.readUInt());
                 char* const name = new char[nameSize+1];
                 carla_zeroChars(name, nameSize+1);
                 bridge.nonRtServerCtrl.readCustomData(name, nameSize);
-
-                CARLA_SAFE_ASSERT_BREAK(portType > kPluginBridgePortNull && portType < kPluginBridgePortTypeCount);
-
-                switch (portType)
-                {
-                case kPluginBridgePortAudioInput:
-                    CARLA_SAFE_ASSERT_BREAK(index < fInfo.aIns);
-                    fInfo.aInNames[index] = name;
-                    break;
-                case kPluginBridgePortAudioOutput:
-                    CARLA_SAFE_ASSERT_BREAK(index < fInfo.aOuts);
-                    fInfo.aOutNames[index] = name;
-                    break;
-                }
 
             }   break;
 
@@ -605,17 +561,17 @@ struct carla_priv {
                 const uint32_t hints  = bridge.nonRtServerCtrl.readUInt();
                 const  int16_t ctrl   = bridge.nonRtServerCtrl.readShort();
 
-//                 CARLA_SAFE_ASSERT_BREAK(ctrl >= CONTROL_INDEX_NONE && ctrl <= CONTROL_INDEX_MAX_ALLOWED);
-//                 CARLA_SAFE_ASSERT_INT2(index < pData->param.count, index, pData->param.count);
-//
-//                 if (index < pData->param.count)
-//                 {
-//                     pData->param.data[index].type   = static_cast<ParameterType>(type);
-//                     pData->param.data[index].index  = static_cast<int32_t>(index);
-//                     pData->param.data[index].rindex = rindex;
-//                     pData->param.data[index].hints  = hints;
-//                     pData->param.data[index].mappedControlIndex = ctrl;
-//                 }
+                CARLA_SAFE_ASSERT_INT_BREAK(ctrl >= CONTROL_INDEX_NONE && ctrl <= CONTROL_INDEX_MAX_ALLOWED, ctrl);
+                CARLA_SAFE_ASSERT_UINT2_BREAK(index < paramCount, index, paramCount);
+
+                if (type != PARAMETER_INPUT)
+                    break;
+                if ((hints & PARAMETER_IS_ENABLED) == 0)
+                    break;
+                if (hints & (PARAMETER_IS_READ_ONLY|PARAMETER_IS_NOT_SAVED))
+                    break;
+
+                paramDetails[index].hints = hints;
             }   break;
 
             case kPluginBridgeNonRtServerParameterData2: {
@@ -640,14 +596,14 @@ struct carla_priv {
                 carla_zeroChars(unit, unitSize+1);
                 bridge.nonRtServerCtrl.readCustomData(unit, unitSize);
 
-//                 CARLA_SAFE_ASSERT_INT2(index < pData->param.count, index, pData->param.count);
-//
-//                 if (index < pData->param.count)
-//                 {
-//                     fParams[index].name   = name;
-//                     fParams[index].symbol = symbol;
-//                     fParams[index].unit   = unit;
-//                 }
+                CARLA_SAFE_ASSERT_UINT2_BREAK(index < paramCount, index, paramCount);
+
+                if (paramDetails[index].hints & PARAMETER_IS_ENABLED)
+                {
+                    paramDetails[index].name   = name;
+                    paramDetails[index].symbol = symbol;
+                    paramDetails[index].unit   = unit;
+                }
             }   break;
 
             case kPluginBridgeNonRtServerParameterRanges: {
@@ -657,23 +613,21 @@ struct carla_priv {
                 const float min      = bridge.nonRtServerCtrl.readFloat();
                 const float max      = bridge.nonRtServerCtrl.readFloat();
                 const float step      = bridge.nonRtServerCtrl.readFloat();
-                const float stepSmall = bridge.nonRtServerCtrl.readFloat();
-                const float stepLarge = bridge.nonRtServerCtrl.readFloat();
+                bridge.nonRtServerCtrl.readFloat();
+                bridge.nonRtServerCtrl.readFloat();
 
-//                 CARLA_SAFE_ASSERT_BREAK(min < max);
-//                 CARLA_SAFE_ASSERT_BREAK(def >= min);
-//                 CARLA_SAFE_ASSERT_BREAK(def <= max);
-//                 CARLA_SAFE_ASSERT_INT2(index < pData->param.count, index, pData->param.count);
-//
-//                 if (index < pData->param.count)
-//                 {
-//                     pData->param.ranges[index].def = def;
-//                     pData->param.ranges[index].min = min;
-//                     pData->param.ranges[index].max = max;
-//                     pData->param.ranges[index].step      = step;
-//                     pData->param.ranges[index].stepSmall = stepSmall;
-//                     pData->param.ranges[index].stepLarge = stepLarge;
-//                 }
+                CARLA_SAFE_ASSERT_BREAK(min < max);
+                CARLA_SAFE_ASSERT_BREAK(def >= min);
+                CARLA_SAFE_ASSERT_BREAK(def <= max);
+                CARLA_SAFE_ASSERT_UINT2_BREAK(index < paramCount, index, paramCount);
+
+                if (paramDetails[index].hints & PARAMETER_IS_ENABLED)
+                {
+                    paramDetails[index].def = paramDetails[index].value = def;
+                    paramDetails[index].min = min;
+                    paramDetails[index].max = max;
+                    paramDetails[index].step = step;
+                }
             }   break;
 
             case kPluginBridgeNonRtServerParameterValue: {
@@ -681,8 +635,8 @@ struct carla_priv {
                 const uint32_t index = bridge.nonRtServerCtrl.readUInt();
                 const float    value = bridge.nonRtServerCtrl.readFloat();
 
-//                 if (index < pData->param.count)
-//                 {
+                if (index < paramCount)
+                {
 //                     const float fixedValue(pData->param.getFixedValue(index, value));
 //
 //                     if (carla_isNotEqual(fParams[index].value, fixedValue))
@@ -690,7 +644,7 @@ struct carla_priv {
 //                         fParams[index].value = fixedValue;
 //                         CarlaPlugin::setParameterValue(index, fixedValue, false, true, true);
 //                     }
-//                 }
+                }
             }   break;
 
             case kPluginBridgeNonRtServerParameterValue2: {
@@ -698,19 +652,17 @@ struct carla_priv {
                 const uint32_t index = bridge.nonRtServerCtrl.readUInt();
                 const float    value = bridge.nonRtServerCtrl.readFloat();
 
-//                 if (index < pData->param.count)
-//                 {
+                if (index < paramCount)
+                {
 //                     const float fixedValue(pData->param.getFixedValue(index, value));
 //                     fParams[index].value = fixedValue;
-//                 }
+                }
             }   break;
 
             case kPluginBridgeNonRtServerParameterTouch: {
                 // uint/index, bool/touch
-                const uint32_t index = bridge.nonRtServerCtrl.readUInt();
-                const bool     touch = bridge.nonRtServerCtrl.readBool();
-
-//                 pData->engine->touchPluginParameter(pData->id, index, touch);
+                bridge.nonRtServerCtrl.readUInt();
+                bridge.nonRtServerCtrl.readBool();
             }   break;
 
             case kPluginBridgeNonRtServerDefaultValue: {
@@ -724,66 +676,36 @@ struct carla_priv {
 
             case kPluginBridgeNonRtServerCurrentProgram: {
                 // int/index
-                const int32_t index = bridge.nonRtServerCtrl.readInt();
-
-//                 CARLA_SAFE_ASSERT_BREAK(index >= -1);
-//                 CARLA_SAFE_ASSERT_INT2(index < static_cast<int32_t>(pData->prog.count), index, pData->prog.count);
-
-//                 CarlaPlugin::setProgram(index, false, true, true);
+                bridge.nonRtServerCtrl.readInt();
             }   break;
 
             case kPluginBridgeNonRtServerCurrentMidiProgram: {
                 // int/index
-                const int32_t index = bridge.nonRtServerCtrl.readInt();
-
-//                 CARLA_SAFE_ASSERT_BREAK(index >= -1);
-//                 CARLA_SAFE_ASSERT_INT2(index < static_cast<int32_t>(pData->midiprog.count), index, pData->midiprog.count);
-
-//                 CarlaPlugin::setMidiProgram(index, false, true, true);
+                bridge.nonRtServerCtrl.readInt();
             }   break;
 
             case kPluginBridgeNonRtServerProgramName: {
                 // uint/index, uint/size, str[] (name)
-                const uint32_t index = bridge.nonRtServerCtrl.readUInt();
+                bridge.nonRtServerCtrl.readUInt();
 
                 // name
                 const uint32_t nameSize(bridge.nonRtServerCtrl.readUInt());
                 char name[nameSize+1];
                 carla_zeroChars(name, nameSize+1);
                 bridge.nonRtServerCtrl.readCustomData(name, nameSize);
-
-//                 CARLA_SAFE_ASSERT_INT2(index < pData->prog.count, index, pData->prog.count);
-//
-//                 if (index < pData->prog.count)
-//                 {
-//                     if (pData->prog.names[index] != nullptr)
-//                         delete[] pData->prog.names[index];
-//                     pData->prog.names[index] = carla_strdup(name);
-//                 }
             }   break;
 
             case kPluginBridgeNonRtServerMidiProgramData: {
                 // uint/index, uint/bank, uint/program, uint/size, str[] (name)
-                const uint32_t index   = bridge.nonRtServerCtrl.readUInt();
-                const uint32_t bank    = bridge.nonRtServerCtrl.readUInt();
-                const uint32_t program = bridge.nonRtServerCtrl.readUInt();
+                bridge.nonRtServerCtrl.readUInt();
+                bridge.nonRtServerCtrl.readUInt();
+                bridge.nonRtServerCtrl.readUInt();
 
                 // name
                 const uint32_t nameSize(bridge.nonRtServerCtrl.readUInt());
                 char name[nameSize+1];
                 carla_zeroChars(name, nameSize+1);
                 bridge.nonRtServerCtrl.readCustomData(name, nameSize);
-
-//                 CARLA_SAFE_ASSERT_INT2(index < pData->midiprog.count, index, pData->midiprog.count);
-//
-//                 if (index < pData->midiprog.count)
-//                 {
-//                     if (pData->midiprog.data[index].name != nullptr)
-//                         delete[] pData->midiprog.data[index].name;
-//                     pData->midiprog.data[index].bank    = bank;
-//                     pData->midiprog.data[index].program = program;
-//                     pData->midiprog.data[index].name    = carla_strdup(name);
-//                 }
             }   break;
 
             case kPluginBridgeNonRtServerSetCustomData: {
@@ -921,11 +843,8 @@ struct carla_priv {
                 break;
 
             case kPluginBridgeNonRtServerResizeEmbedUI: {
-                const uint width = bridge.nonRtServerCtrl.readUInt();
-                const uint height = bridge.nonRtServerCtrl.readUInt();
-//                 pData->engine->callback(true, true, ENGINE_CALLBACK_EMBED_UI_RESIZED, pData->id,
-//                                         static_cast<int>(width), static_cast<int>(height),
-//                                         0, 0.0f, nullptr);
+                bridge.nonRtServerCtrl.readUInt();
+                bridge.nonRtServerCtrl.readUInt();
             }   break;
 
             case kPluginBridgeNonRtServerUiClosed:
@@ -1122,14 +1041,141 @@ void carla_priv_set_buffer_size(struct carla_priv *priv, enum buffer_size_mode b
 
 // --------------------------------------------------------------------------------------------------------------------
 
+static bool carla_priv_param_changed(void *data, obs_properties_t *props, obs_property_t *property, obs_data_t *settings)
+{
+    UNUSED_PARAMETER(props);
+
+    struct carla_priv *priv = static_cast<struct carla_priv*>(data);
+
+    const char *const pname = obs_property_name(property);
+    if (pname == NULL)
+        return false;
+
+    const char* pname2 = pname + 1;
+    while (*pname2 == '0')
+        ++pname2;
+
+    const int pindex = atoi(pname2);
+
+    if (pindex < 0 || pindex >= (int)priv->paramCount)
+        return false;
+
+    const uint index = static_cast<uint>(pindex);
+
+    const float min = priv->paramDetails[index].min;
+    const float max = priv->paramDetails[index].max;
+
+    float value;
+    switch (obs_property_get_type(property))
+    {
+    case OBS_PROPERTY_BOOL:
+        value = obs_data_get_bool(settings, pname) ? max : min;
+        break;
+    case OBS_PROPERTY_INT:
+        value = obs_data_get_int(settings, pname);
+        if (value < min)
+            value = min;
+        else if (value > max)
+            value = max;
+        break;
+    case OBS_PROPERTY_FLOAT:
+        value = obs_data_get_double(settings, pname);
+        if (value < min)
+            value = min;
+        else if (value > max)
+            value = max;
+        break;
+    default:
+        return false;
+    }
+
+    priv->paramDetails[index].value = value;
+
+    {
+        const CarlaMutexLocker _cml(priv->bridge.nonRtClientCtrl.mutex);
+
+        priv->bridge.nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientSetParameterValue);
+        priv->bridge.nonRtClientCtrl.writeUInt(index);
+        priv->bridge.nonRtClientCtrl.writeFloat(value);
+        priv->bridge.nonRtClientCtrl.commitWrite();
+
+        priv->bridge.nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientUiParameterChange);
+        priv->bridge.nonRtClientCtrl.writeUInt(index);
+        priv->bridge.nonRtClientCtrl.writeFloat(value);
+        priv->bridge.nonRtClientCtrl.commitWrite();
+
+        priv->bridge.nonRtClientCtrl.waitIfDataIsReachingLimit();
+    }
+
+    return false;
+}
+
 void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *props, bool reset)
 {
+    obs_data_t *settings = obs_source_get_settings(priv->source);
+
     if (priv->fBridgeThread.isThreadRunning())
     {
         obs_properties_add_button2(props, PROP_SHOW_GUI, obs_module_text("Show custom GUI"),
                                    carla_priv_show_gui_callback, priv);
     }
 
+    char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
+
+    for (uint32_t i=0; i < priv->paramCount; ++i)
+    {
+        const carla_param_data& param(priv->paramDetails[i]);
+
+        if ((param.hints & PARAMETER_IS_ENABLED) == 0)
+            continue;
+
+        param_index_to_name(i, pname);
+        priv->paramDetails[i].hints = param.hints;
+        priv->paramDetails[i].min = param.min;
+        priv->paramDetails[i].max = param.max;
+
+        obs_property_t *prop;
+
+        if (param.hints & PARAMETER_IS_BOOLEAN)
+        {
+            prop = obs_properties_add_bool(props, pname, param.name);
+
+            obs_data_set_default_bool(settings, pname, param.def == param.max);
+
+            if (reset)
+                obs_data_set_bool(settings, pname, param.def == param.max);
+        }
+        else if (param.hints & PARAMETER_IS_INTEGER)
+        {
+            prop = obs_properties_add_int_slider(props, pname, param.name,
+                                                 param.min, param.max, param.step);
+
+            obs_data_set_default_int(settings, pname, param.def);
+
+            if (param.unit && *param.unit)
+                obs_property_int_set_suffix(prop, param.unit);
+
+            if (reset)
+                obs_data_set_int(settings, pname, param.def);
+        }
+        else
+        {
+            prop = obs_properties_add_float_slider(props, pname, param.name,
+                                                   param.min, param.max, param.step);
+
+            obs_data_set_default_double(settings, pname, param.def);
+
+            if (param.unit && *param.unit)
+                obs_property_float_set_suffix(prop, param.unit);
+
+            if (reset)
+                obs_data_set_double(settings, pname, param.def);
+        }
+
+        obs_property_set_modified_callback2(prop, carla_priv_param_changed, priv);
+    }
+
+    obs_data_release(settings);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
