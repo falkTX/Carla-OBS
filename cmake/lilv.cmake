@@ -2,8 +2,19 @@
 # Copyright (C) 2023 Filipe Coelho <falktx@falktx.com>
 # SPDX-License-Identifier: GPL-2.0-or-later
 
+add_library(carla_lilv INTERFACE)
+
+###############################################################################
+# base config
+
 set(carla_lilv_compile_options
   -Wno-error
+  -Wno-deprecated-declarations
+  -Wno-discarded-qualifiers
+  -Wno-format-overflow
+  -Wno-implicit-fallthrough
+  -Wno-maybe-uninitialized
+  -Wno-unused-parameter
 )
 
 set(carla_lilv_basedir carla/source/modules/lilv)
@@ -111,8 +122,6 @@ target_sources(carla_lilv_lilv PRIVATE
 
 ###############################################################################
 # combined target
-
-add_library(carla_lilv INTERFACE)
 
 target_link_libraries(carla_lilv INTERFACE
   carla_lilv_serd

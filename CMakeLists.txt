@@ -28,9 +28,7 @@ target_compile_options(carla PRIVATE
 target_include_directories(carla PRIVATE
   carla/source
   carla/source/backend
-  carla/source/backend/engine
   carla/source/frontend
-  carla/source/frontend/pluginlist
   carla/source/frontend/utils
   carla/source/includes
   carla/source/modules
@@ -44,8 +42,13 @@ target_link_options(carla PRIVATE
 
 ###############################################################################
 
-include(carla-lilv/CMakeLists.txt)
+include(cmake/jackbridge.cmake)
+include(cmake/lilv.cmake)
+include(cmake/water.cmake)
+
+add_library(OBS::carla_jackbridge ALIAS carla_jackbridge)
 add_library(OBS::carla_lilv ALIAS carla_lilv)
+add_library(OBS::carla_water ALIAS carla_water)
 
 ###############################################################################
 
@@ -59,9 +62,6 @@ target_sources(carla PRIVATE
   carla/source/frontend/carla_frontend.cpp
   carla/source/frontend/pluginlist/pluginlistdialog.cpp
   carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
-  carla/source/jackbridge/JackBridge1.cpp
-  carla/source/jackbridge/JackBridge2.cpp
-  carla/source/modules/water/water.cpp
   carla/source/utils/CarlaBridgeUtils.cpp
 )
 
@@ -70,7 +70,9 @@ target_link_directories(carla PRIVATE
 )
 
 target_link_libraries(carla PRIVATE
+  OBS::carla_jackbridge
   OBS::carla_lilv
+  OBS::carla_water
   OBS::libobs
   OBS::frontend-api
   Qt::Core
