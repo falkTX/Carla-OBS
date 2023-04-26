@@ -12,6 +12,18 @@ endif()
 add_library(carla MODULE)
 add_library(OBS::carla ALIAS carla)
 
+###############################################################################
+
+include(cmake/jackbridge.cmake)
+include(cmake/lilv.cmake)
+include(cmake/water.cmake)
+
+add_library(OBS::carla_jackbridge ALIAS carla_jackbridge)
+add_library(OBS::carla_lilv ALIAS carla_lilv)
+add_library(OBS::carla_water ALIAS carla_water)
+
+###############################################################################
+
 target_compile_definitions(carla PRIVATE
   CARLA_BACKEND_NAMESPACE=CarlaOBS
   #CARLA_ENGINE_WITHOUT_UI
@@ -36,35 +48,6 @@ target_include_directories(carla PRIVATE
   ${LIBMAGIC_INCLUDE_DIRS}
 )
 
-target_link_options(carla PRIVATE
-  -Wl,--no-undefined
-)
-
-###############################################################################
-
-include(cmake/jackbridge.cmake)
-include(cmake/lilv.cmake)
-include(cmake/water.cmake)
-
-add_library(OBS::carla_jackbridge ALIAS carla_jackbridge)
-add_library(OBS::carla_lilv ALIAS carla_lilv)
-add_library(OBS::carla_water ALIAS carla_water)
-
-###############################################################################
-
-target_sources(carla PRIVATE
-  carla.c
-  carla-bridge-wrapper.cpp
-  qtutils.cpp
-  carla/source/backend/utils/CachedPlugins.cpp
-  carla/source/backend/utils/JUCE.cpp
-  carla/source/backend/utils/Information.cpp
-  carla/source/frontend/carla_frontend.cpp
-  carla/source/frontend/pluginlist/pluginlistdialog.cpp
-  carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
-  carla/source/utils/CarlaBridgeUtils.cpp
-)
-
 target_link_directories(carla PRIVATE
   ${LIBMAGIC_LIBRARY_DIRS}
 )
@@ -81,12 +64,30 @@ target_link_libraries(carla PRIVATE
   ${LIBMAGIC_LIBRARIES}
 )
 
+target_link_options(carla PRIVATE
+  -Wl,--no-undefined
+)
+
 set_target_properties(carla PROPERTIES
   AUTOMOC ON
   AUTOUIC ON
   AUTORCC ON
   FOLDER "plugins"
   PROJECT_LABEL "Carla Plugin Host"
+)
+
+target_sources(carla PRIVATE
+  carla.c
+  carla-bridge.cpp
+  carla-bridge-wrapper.cpp
+  qtutils.cpp
+  carla/source/backend/utils/CachedPlugins.cpp
+  carla/source/backend/utils/JUCE.cpp
+  carla/source/backend/utils/Information.cpp
+  carla/source/frontend/carla_frontend.cpp
+  carla/source/frontend/pluginlist/pluginlistdialog.cpp
+  carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
+  carla/source/utils/CarlaBridgeUtils.cpp
 )
 
 setup_plugin_target(carla)

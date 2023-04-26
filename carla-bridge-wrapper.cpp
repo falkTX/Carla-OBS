@@ -4,316 +4,46 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
+#include "carla-bridge.h"
 #include "carla-wrapper.h"
 #include "qtutils.h"
 #include <util/platform.h>
 
 #include "CarlaBackendUtils.hpp"
-#include "CarlaBridgeUtils.hpp"
 #include "CarlaJuceUtils.hpp"
-#include "CarlaScopeUtils.hpp"
 #include "CarlaShmUtils.hpp"
-#include "CarlaThread.hpp"
 
 #include "jackbridge/JackBridge.hpp"
 
 #include "CarlaFrontend.h"
 
-#include "water/files/File.h"
-#include "water/misc/Time.h"
-#include "water/threads/ChildProcess.h"
-
-#include <ctime>
 #include <vector>
 
 // generates a warning if this is defined as anything else
 #define CARLA_API
 
-CARLA_BACKEND_USE_NAMESPACE
-
-// ---------------------------------------------------------------------------------------------------------------------
-
-class CarlaPluginBridgeThread : public CarlaThread
-{
-public:
-    CarlaPluginBridgeThread() noexcept
-        : CarlaThread("CarlaPluginBridgeThread")
-    {
-    }
-
-    void setData(const PluginType type,
-                 const char* const binaryArchName,
-                 const char* const bridgeBinary,
-                 const char* const label,
-                 const char* const filename,
-                 const int64_t uniqueId,
-                 const char* const shmIds) noexcept
-    {
-        CARLA_SAFE_ASSERT_RETURN(bridgeBinary != nullptr && bridgeBinary[0] != '\0',);
-        CARLA_SAFE_ASSERT_RETURN(shmIds != nullptr && shmIds[0] != '\0',);
-        CARLA_SAFE_ASSERT(! isThreadRunning());
-
-        fPluginType = type;
-        fPluginUniqueId = uniqueId;
-        fBinaryArchName = binaryArchName;
-        fBridgeBinary = bridgeBinary;
-        fShmIds = shmIds;
-
-        if (label != nullptr)
-            fPluginLabel = label;
-        if (fPluginLabel.isEmpty())
-            fPluginLabel = "(none)";
-
-        if (filename != nullptr)
-            fPluginFilename = filename;
-        if (fPluginFilename.isEmpty())
-            fPluginFilename = "(none)";
-    }
-
-protected:
-    void run()
-    {
-        if (fProcess == nullptr)
-        {
-            fProcess = new water::ChildProcess();
-        }
-        else if (fProcess->isRunning())
-        {
-            carla_stderr("CarlaPluginBridgeThread::run() - already running");
-        }
-
-        char strBuf[STR_MAX+1];
-        strBuf[STR_MAX] = '\0';
-
-        // setup binary arch
-        water::ChildProcess::Type childType;
-#ifdef CARLA_OS_MAC
-        if (fBinaryArchName == "arm64")
-            childType = water::ChildProcess::TypeARM;
-        else if (fBinaryArchName == "x86_64")
-            childType = water::ChildProcess::TypeIntel;
-        else
-#endif
-            childType = water::ChildProcess::TypeAny;
-
-        water::StringArray arguments;
-
-        // bridge binary
-        arguments.add(fBridgeBinary);
-
-        // plugin type
-        arguments.add(getPluginTypeAsString(fPluginType));
-
-        // filename
-        arguments.add(fPluginFilename);
-
-        // label
-        arguments.add(fPluginLabel);
-
-        // uniqueId
-        arguments.add(water::String(static_cast<water::int64>(fPluginUniqueId)));
-
-        bool started;
-
-        {
-            const CarlaScopedEnvVar sev("ENGINE_BRIDGE_SHM_IDS", fShmIds.toRawUTF8());
-
-            carla_stdout("Starting plugin bridge, command is:\n%s \"%s\" \"%s\" \"%s\" " P_INT64,
-                         fBridgeBinary.toRawUTF8(),
-                         getPluginTypeAsString(fPluginType),
-                         fPluginFilename.toRawUTF8(),
-                         fPluginLabel.toRawUTF8(),
-                         fPluginUniqueId);
-
-            started = fProcess->start(arguments, childType);
-        }
-
-        if (! started)
-        {
-            carla_stdout("failed!");
-            fProcess = nullptr;
-            return;
-        }
-
-        for (; fProcess->isRunning() && ! shouldThreadExit();)
-            carla_sleep(1);
-
-        // we only get here if bridge crashed or thread asked to exit
-        if (fProcess->isRunning() && shouldThreadExit())
-        {
-            fProcess->waitForProcessToFinish(2000);
-
-            if (fProcess->isRunning())
-            {
-                carla_stdout("CarlaPluginBridgeThread::run() - bridge refused to close, force kill now");
-                fProcess->kill();
-            }
-            else
-            {
-                carla_stdout("CarlaPluginBridgeThread::run() - bridge auto-closed successfully");
-            }
-        }
-        else
-        {
-            // forced quit, may have crashed
-            if (fProcess->getExitCodeAndClearPID() != 0)
-            {
-                carla_stderr("CarlaPluginBridgeThread::run() - bridge crashed");
-
-                CarlaString errorString("Plugin has crashed!\n"
-                                        "Saving now will lose its current settings.\n"
-                                        "Please remove this plugin, and not rely on it from this point.");
-            }
-        }
-
-        fProcess = nullptr;
-    }
-
-private:
-    PluginType fPluginType;
-    int64_t fPluginUniqueId;
-    water::String fBinaryArchName;
-    water::String fBridgeBinary;
-    water::String fPluginFilename;
-    water::String fPluginLabel;
-    water::String fShmIds;
-#ifndef CARLA_OS_WIN
-    water::String fWinePrefix;
-#endif
-
-    CarlaScopedPointer<water::ChildProcess> fProcess;
-
-    CARLA_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CarlaPluginBridgeThread)
-};
-
 // --------------------------------------------------------------------------------------------------------------------
 // private data methods
 
-struct carla_param_data {
-    uint32_t hints = 0;
-    float value = 0.f;
-    float def = 0.f;
-    float min = 0.f;
-    float max = 1.f;
-    float step = 0.01f;
-    CarlaString name;
-    CarlaString symbol;
-    CarlaString unit;
-};
-
 struct carla_priv {
-    obs_source_t *source;
-    uint32_t bufferSize;
-    double sampleRate;
+    obs_source_t *source = nullptr;
+    uint32_t bufferSize = 0;
+    double sampleRate = 0;
     bool loaded = false;
 
     // cached parameter info
-    uint32_t paramCount;
+    uint32_t paramCount = 0;
     struct carla_param_data* paramDetails = nullptr;
 
     // update properties when timeout is reached, 0 means do nothing
-    uint64_t update_requested;
+    uint64_t update_requested = 0;
 
-    CarlaString             fBridgeBinary;
-    CarlaPluginBridgeThread fBridgeThread;
+    carla_bridge bridge;
 
     ~carla_priv()
     {
         delete[] paramDetails;
     }
-
-    struct {
-        BridgeAudioPool          audiopool; // fShmAudioPool
-        BridgeRtClientControl    rtClientCtrl; // fShmRtClientControl
-        BridgeNonRtClientControl nonRtClientCtrl; // fShmNonRtClientControl
-        BridgeNonRtServerControl nonRtServerCtrl; // fShmNonRtServerControl
-
-        // init sem/shm
-        bool init(uint32_t bufferSize, double sampleRate)
-        {
-            std::srand(static_cast<uint>(std::time(nullptr)));
-
-            if (! audiopool.initializeServer())
-            {
-                carla_stderr("Failed to initialize shared memory audio pool");
-                return false;
-            }
-
-            audiopool.resize(MAX_AUDIO_BUFFER_SIZE, MAX_AV_PLANES, MAX_AV_PLANES);
-
-            if (! rtClientCtrl.initializeServer())
-            {
-                carla_stderr("Failed to initialize RT client control");
-                audiopool.clear();
-                return false;
-            }
-
-            if (! nonRtClientCtrl.initializeServer())
-            {
-                carla_stderr("Failed to initialize Non-RT client control");
-                rtClientCtrl.clear();
-                audiopool.clear();
-                return false;
-            }
-
-            if (! nonRtServerCtrl.initializeServer())
-            {
-                carla_stderr("Failed to initialize Non-RT server control");
-                nonRtClientCtrl.clear();
-                rtClientCtrl.clear();
-                audiopool.clear();
-                return false;
-            }
-
-            rtClientCtrl.data->procFlags = 0;
-            carla_zeroStruct(rtClientCtrl.data->timeInfo);
-            carla_zeroBytes(rtClientCtrl.data->midiOut, kBridgeRtClientDataMidiOutSize);
-
-            rtClientCtrl.clearData();
-            nonRtClientCtrl.clearData();
-            nonRtServerCtrl.clearData();
-
-            nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientVersion);
-            nonRtClientCtrl.writeUInt(CARLA_PLUGIN_BRIDGE_API_VERSION_CURRENT);
-
-            nonRtClientCtrl.writeUInt(static_cast<uint32_t>(sizeof(BridgeRtClientData)));
-            nonRtClientCtrl.writeUInt(static_cast<uint32_t>(sizeof(BridgeNonRtClientData)));
-            nonRtClientCtrl.writeUInt(static_cast<uint32_t>(sizeof(BridgeNonRtServerData)));
-
-            nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientInitialSetup);
-            nonRtClientCtrl.writeUInt(bufferSize);
-            nonRtClientCtrl.writeDouble(sampleRate);
-
-            nonRtClientCtrl.commitWrite();
-
-//             if (audiopool.dataSize != 0)
-            {
-                rtClientCtrl.writeOpcode(kPluginBridgeRtClientSetAudioPool);
-                rtClientCtrl.writeULong(static_cast<uint64_t>(audiopool.dataSize));
-                rtClientCtrl.commitWrite();
-            }
-//             else
-//             {
-//                 // testing dummy message
-//                 rtClientCtrl.writeOpcode(kPluginBridgeRtClientNull);
-//                 rtClientCtrl.commitWrite();
-//             }
-
-            rtClientCtrl.writeOpcode(kPluginBridgeRtClientSetBufferSize);
-            rtClientCtrl.writeUInt(bufferSize);
-            rtClientCtrl.commitWrite();
-
-            return true;
-        }
-
-        void cleanup()
-        {
-            nonRtServerCtrl.clear();
-            nonRtClientCtrl.clear();
-            rtClientCtrl.clear();
-            audiopool.clear();
-        }
-    } bridge;
 
     struct Info {
         uint32_t aIns, aOuts;
@@ -944,21 +674,7 @@ fail1:
 
 void carla_priv_destroy(struct carla_priv *priv)
 {
-    if (priv->fBridgeThread.isThreadRunning())
-    {
-        priv->bridge.nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientQuit);
-        priv->bridge.nonRtClientCtrl.commitWrite();
-
-        priv->bridge.rtClientCtrl.writeOpcode(kPluginBridgeRtClientQuit);
-        priv->bridge.rtClientCtrl.commitWrite();
-
-//         if (! fTimedOut)
-            priv->waitForClient("stopping", 3000);
-
-        priv->fBridgeThread.stopThread(3000);
-    }
-
-    priv->bridge.cleanup();
+    carla_bridge_destroy(&priv->bridge);
     delete priv;
 }
 
@@ -966,43 +682,17 @@ void carla_priv_destroy(struct carla_priv *priv)
 
 void carla_priv_activate(struct carla_priv *priv)
 {
-    {
-        const CarlaMutexLocker _cml(priv->bridge.nonRtClientCtrl.mutex);
-
-        priv->bridge.nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientActivate);
-        priv->bridge.nonRtClientCtrl.commitWrite();
-    }
-
-    if (priv->fBridgeThread.isThreadRunning())
-    {
-        try {
-            priv->waitForClient("activate", 2000);
-        } CARLA_SAFE_EXCEPTION("activate - waitForClient");
-    }
+    carla_bridge_activate(&priv->bridge);
 }
 
 void carla_priv_deactivate(struct carla_priv *priv)
 {
-    {
-        const CarlaMutexLocker _cml(priv->bridge.nonRtClientCtrl.mutex);
-
-        priv->bridge.nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientDeactivate);
-        priv->bridge.nonRtClientCtrl.commitWrite();
-    }
-
-//     fTimedOut = false;
-
-    if (priv->fBridgeThread.isThreadRunning())
-    {
-        try {
-            priv->waitForClient("deactivate", 2000);
-        } CARLA_SAFE_EXCEPTION("deactivate - waitForClient");
-    }
+    carla_bridge_deactivate(&priv->bridge);
 }
 
 void carla_priv_process_audio(struct carla_priv *priv, float *buffers[2], uint32_t frames)
 {
-    if (!priv->fBridgeThread.isThreadRunning())
+    if (!priv->bridge.thread.isThreadRunning())
         return;
 
     for (uint32_t c=0; c < 2; ++c)
@@ -1020,7 +710,7 @@ void carla_priv_process_audio(struct carla_priv *priv, float *buffers[2], uint32
 
 void carla_priv_idle(struct carla_priv *priv)
 {
-    if (priv->fBridgeThread.isThreadRunning())
+    if (priv->bridge.thread.isThreadRunning())
     {
 //         if (priv->loaded && fTimedOut && pData->active)
 //             setActive(false, true, true);
@@ -1155,7 +845,7 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
 {
     obs_data_t *settings = obs_source_get_settings(priv->source);
 
-    if (priv->fBridgeThread.isThreadRunning())
+    if (priv->bridge.thread.isThreadRunning())
     {
         obs_properties_add_button2(props, PROP_SHOW_GUI, obs_module_text("Show custom GUI"),
                                    carla_priv_show_gui_callback, priv);
@@ -1251,21 +941,8 @@ bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *
     if (plugin == NULL)
         return false;
 
-    if (priv->fBridgeThread.isThreadRunning())
-    {
-        priv->bridge.nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientQuit);
-        priv->bridge.nonRtClientCtrl.commitWrite();
+    carla_bridge_destroy(&priv->bridge);
 
-        priv->bridge.rtClientCtrl.writeOpcode(kPluginBridgeRtClientQuit);
-        priv->bridge.rtClientCtrl.commitWrite();
-
-//         if (! fTimedOut)
-            priv->waitForClient("stopping", 3000);
-
-        priv->fBridgeThread.stopThread(3000);
-    }
-
-    priv->bridge.cleanup();
     priv->bridge.init(priv->bufferSize, priv->sampleRate);
 
     {
@@ -1277,7 +954,7 @@ bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *
         std::strncpy(shmIdsStr+6*2, &priv->bridge.nonRtClientCtrl.filename[priv->bridge.nonRtClientCtrl.filename.length()-6], 6);
         std::strncpy(shmIdsStr+6*3, &priv->bridge.nonRtServerCtrl.filename[priv->bridge.nonRtServerCtrl.filename.length()-6], 6);
 
-        priv->fBridgeThread.setData((PluginType)plugin->type,
+        priv->bridge.thread.setData((PluginType)plugin->type,
                                     "x86_64",
                                     "/usr/lib/carla/carla-bridge-native",
                                     plugin->label,
@@ -1288,9 +965,9 @@ bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *
 
     priv->loaded = false;
 
-    priv->fBridgeThread.startThread();
+    priv->bridge.thread.startThread();
 
-    for (;priv->fBridgeThread.isThreadRunning();)
+    for (;priv->bridge.thread.isThreadRunning();)
     {
         carla_priv_idle(priv);
 
@@ -1313,7 +990,7 @@ bool carla_priv_show_gui_callback(obs_properties_t *props, obs_property_t *prope
 
     struct carla_priv *priv = static_cast<struct carla_priv*>(data);
 
-    if (priv->fBridgeThread.isThreadRunning())
+    if (priv->bridge.thread.isThreadRunning())
     {
         const CarlaMutexLocker _cml(priv->bridge.nonRtClientCtrl.mutex);
 
