@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-#include "carla-bridge.h"
+#include "carla-bridge.hpp"
 #include "carla-wrapper.h"
 #include "qtutils.h"
 #include <util/platform.h>
@@ -24,6 +24,18 @@
 
 // --------------------------------------------------------------------------------------------------------------------
 // private data methods
+
+struct carla_param_data {
+    uint32_t hints = 0;
+    float value = 0.f;
+    float def = 0.f;
+    float min = 0.f;
+    float max = 1.f;
+    float step = 0.01f;
+    CarlaString name;
+    CarlaString symbol;
+    CarlaString unit;
+};
 
 struct carla_priv {
     obs_source_t *source = nullptr;
@@ -633,19 +645,6 @@ struct carla_priv {
             }
         }
     }
-
-    void waitForClient(const char* const action, const uint msecs)
-    {
-//         CARLA_SAFE_ASSERT_RETURN(! fTimedOut,);
-//         CARLA_SAFE_ASSERT_RETURN(! fTimedError,);
-
-        if (bridge.rtClientCtrl.waitForClient(msecs))
-            return;
-
-//         fTimedOut = true;
-        carla_stderr2("waitForClient(%s) timed out", action);
-    }
-
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -674,7 +673,7 @@ fail1:
 
 void carla_priv_destroy(struct carla_priv *priv)
 {
-    carla_bridge_destroy(&priv->bridge);
+    priv->bridge.cleanup();
     delete priv;
 }
 
@@ -682,21 +681,21 @@ void carla_priv_destroy(struct carla_priv *priv)
 
 void carla_priv_activate(struct carla_priv *priv)
 {
-    carla_bridge_activate(&priv->bridge);
+    priv->bridge.activate();
 }
 
 void carla_priv_deactivate(struct carla_priv *priv)
 {
-    carla_bridge_deactivate(&priv->bridge);
+    priv->bridge.deactivate();
 }
 
 void carla_priv_process_audio(struct carla_priv *priv, float *buffers[2], uint32_t frames)
 {
-    if (!priv->bridge.thread.isThreadRunning())
+    if (!priv->bridge.isRunning())
         return;
 
     for (uint32_t c=0; c < 2; ++c)
-        carla_copyFloats(priv->bridge.audiopool.data + (c * MAX_AUDIO_BUFFER_SIZE), buffers[c], frames);
+        carla_copyFloats(priv->bridge.audiopool.data + (c * priv->bufferSize), buffers[c], frames);
 
     {
         priv->bridge.rtClientCtrl.writeOpcode(kPluginBridgeRtClientProcess);
@@ -704,13 +703,13 @@ void carla_priv_process_audio(struct carla_priv *priv, float *buffers[2], uint32
         priv->bridge.rtClientCtrl.commitWrite();
     }
 
-    priv->waitForClient("process", 1000);
+    priv->bridge.wait("process", 1000);
 
 }
 
 void carla_priv_idle(struct carla_priv *priv)
 {
-    if (priv->bridge.thread.isThreadRunning())
+    if (priv->bridge.isRunning())
     {
 //         if (priv->loaded && fTimedOut && pData->active)
 //             setActive(false, true, true);
@@ -845,7 +844,7 @@ void carla_priv_readd_properties(struct carla_priv *priv, obs_properties_t *prop
 {
     obs_data_t *settings = obs_source_get_settings(priv->source);
 
-    if (priv->bridge.thread.isThreadRunning())
+    if (priv->bridge.isRunning())
     {
         obs_properties_add_button2(props, PROP_SHOW_GUI, obs_module_text("Show custom GUI"),
                                    carla_priv_show_gui_callback, priv);
@@ -941,33 +940,19 @@ bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *
     if (plugin == NULL)
         return false;
 
-    carla_bridge_destroy(&priv->bridge);
-
+    priv->bridge.cleanup();
     priv->bridge.init(priv->bufferSize, priv->sampleRate);
-
-    {
-        char shmIdsStr[6*4+1];
-        carla_zeroChars(shmIdsStr, 6*4+1);
-
-        std::strncpy(shmIdsStr+6*0, &priv->bridge.audiopool.filename[priv->bridge.audiopool.filename.length()-6], 6);
-        std::strncpy(shmIdsStr+6*1, &priv->bridge.rtClientCtrl.filename[priv->bridge.rtClientCtrl.filename.length()-6], 6);
-        std::strncpy(shmIdsStr+6*2, &priv->bridge.nonRtClientCtrl.filename[priv->bridge.nonRtClientCtrl.filename.length()-6], 6);
-        std::strncpy(shmIdsStr+6*3, &priv->bridge.nonRtServerCtrl.filename[priv->bridge.nonRtServerCtrl.filename.length()-6], 6);
-
-        priv->bridge.thread.setData((PluginType)plugin->type,
-                                    "x86_64",
-                                    "/usr/lib/carla/carla-bridge-native",
-                                    plugin->label,
-                                    plugin->filename,
-                                    plugin->uniqueId,
-                                    shmIdsStr);
-    }
 
     priv->loaded = false;
 
-    priv->bridge.thread.startThread();
+    priv->bridge.start((PluginType)plugin->type,
+                       "x86_64",
+                       "/usr/lib/carla/carla-bridge-native",
+                       plugin->label,
+                       plugin->filename,
+                       plugin->uniqueId);
 
-    for (;priv->bridge.thread.isThreadRunning();)
+    for (;priv->bridge.isRunning();)
     {
         carla_priv_idle(priv);
 
@@ -990,7 +975,7 @@ bool carla_priv_show_gui_callback(obs_properties_t *props, obs_property_t *prope
 
     struct carla_priv *priv = static_cast<struct carla_priv*>(data);
 
-    if (priv->bridge.thread.isThreadRunning())
+    if (priv->bridge.isRunning())
     {
         const CarlaMutexLocker _cml(priv->bridge.nonRtClientCtrl.mutex);
 

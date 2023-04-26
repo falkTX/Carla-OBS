@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-#include "carla-bridge.h"
-#include "carla-wrapper.h"
+#include "carla-bridge.hpp"
+
+#include <obs-module.h>
 
 #include "CarlaBackendUtils.hpp"
 
@@ -159,7 +160,7 @@ bool carla_bridge::init(uint32_t bufferSize, double sampleRate)
         return false;
     }
 
-    audiopool.resize(MAX_AUDIO_BUFFER_SIZE, MAX_AV_PLANES, MAX_AV_PLANES);
+    audiopool.resize(bufferSize, MAX_AV_PLANES, MAX_AV_PLANES);
 
     if (! rtClientCtrl.initializeServer())
     {
@@ -204,9 +205,13 @@ bool carla_bridge::init(uint32_t bufferSize, double sampleRate)
     rtClientCtrl.writeULong(static_cast<uint64_t>(audiopool.dataSize));
     rtClientCtrl.commitWrite();
 
-    rtClientCtrl.writeOpcode(kPluginBridgeRtClientSetBufferSize);
-    rtClientCtrl.writeUInt(bufferSize);
-    rtClientCtrl.commitWrite();
+    carla_zeroStruct(shmIdsStr);
+    std::strncpy(shmIdsStr+6*0, &audiopool.filename[audiopool.filename.length()-6], 6);
+    std::strncpy(shmIdsStr+6*1, &rtClientCtrl.filename[rtClientCtrl.filename.length()-6], 6);
+    std::strncpy(shmIdsStr+6*2, &nonRtClientCtrl.filename[nonRtClientCtrl.filename.length()-6], 6);
+    std::strncpy(shmIdsStr+6*3, &nonRtServerCtrl.filename[nonRtServerCtrl.filename.length()-6], 6);
+
+    timedOut = false;
 
     return true;
 
@@ -221,83 +226,90 @@ fail1:
     return false;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
-
 void carla_bridge::cleanup()
 {
+    if (thread.isThreadRunning())
+    {
+        nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientQuit);
+        nonRtClientCtrl.commitWrite();
+
+        rtClientCtrl.writeOpcode(kPluginBridgeRtClientQuit);
+        rtClientCtrl.commitWrite();
+
+        if (! timedOut)
+            wait("stopping", 3000);
+
+        thread.stopThread(3000);
+    }
+
     nonRtServerCtrl.clear();
     nonRtClientCtrl.clear();
     rtClientCtrl.clear();
     audiopool.clear();
 }
 
-// --------------------------------------------------------------------------------------------------------------------
-
-static void waitForClient(struct carla_bridge *bridge, const char* const action, const uint msecs)
+bool carla_bridge::start(PluginType type,
+            const char* binaryArchName,
+            const char* bridgeBinary,
+            const char* label,
+            const char* filename,
+            int64_t uniqueId)
 {
-//         CARLA_SAFE_ASSERT_RETURN(! fTimedOut,);
+    thread.setData(type, binaryArchName, bridgeBinary, label, filename, uniqueId, shmIdsStr);
+    return thread.startThread();
+}
+
+bool carla_bridge::isRunning() const
+{
+    return thread.isThreadRunning();
+}
+
+void carla_bridge::wait(const char* const action, const uint msecs)
+{
+        CARLA_SAFE_ASSERT_RETURN(! timedOut,);
 //         CARLA_SAFE_ASSERT_RETURN(! fTimedError,);
 
-    if (bridge->rtClientCtrl.waitForClient(msecs))
+    if (rtClientCtrl.waitForClient(msecs))
         return;
 
-//         fTimedOut = true;
+    timedOut = true;
     carla_stderr2("waitForClient(%s) timed out", action);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
-void carla_bridge_destroy(struct carla_bridge *bridge)
-{
-    if (bridge->thread.isThreadRunning())
-    {
-        bridge->nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientQuit);
-        bridge->nonRtClientCtrl.commitWrite();
-
-        bridge->rtClientCtrl.writeOpcode(kPluginBridgeRtClientQuit);
-        bridge->rtClientCtrl.commitWrite();
-
-//         if (! fTimedOut)
-            waitForClient(bridge, "stopping", 3000);
-
-        bridge->thread.stopThread(3000);
-    }
-
-    bridge->cleanup();
-}
-
-void carla_bridge_activate(struct carla_bridge *bridge)
+void carla_bridge::activate()
 {
     {
-        const CarlaMutexLocker _cml(bridge->nonRtClientCtrl.mutex);
+        const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
 
-        bridge->nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientActivate);
-        bridge->nonRtClientCtrl.commitWrite();
+        nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientActivate);
+        nonRtClientCtrl.commitWrite();
     }
 
-    if (bridge->thread.isThreadRunning())
+    if (thread.isThreadRunning())
     {
         try {
-            waitForClient(bridge, "activate", 2000);
+            wait("activate", 2000);
         } CARLA_SAFE_EXCEPTION("activate - waitForClient");
     }
 }
 
-void carla_bridge_deactivate(struct carla_bridge *bridge)
+void carla_bridge::deactivate()
 {
     {
-        const CarlaMutexLocker _cml(bridge->nonRtClientCtrl.mutex);
+        const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
 
-        bridge->nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientDeactivate);
-        bridge->nonRtClientCtrl.commitWrite();
+        nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientDeactivate);
+        nonRtClientCtrl.commitWrite();
     }
 
-//     fTimedOut = false;
+    // timedOut = false;
 
-    if (bridge->thread.isThreadRunning())
+    if (thread.isThreadRunning())
     {
         try {
-            waitForClient(bridge, "deactivate", 2000);
+            wait("deactivate", 2000);
         } CARLA_SAFE_EXCEPTION("deactivate - waitForClient");
     }
 }

@@ -40,9 +40,6 @@ private:
     water::String fPluginFilename;
     water::String fPluginLabel;
     water::String fShmIds;
-#ifndef CARLA_OS_WIN
-    water::String fWinePrefix;
-#endif
 
     CarlaScopedPointer<water::ChildProcess> fProcess;
 
@@ -51,44 +48,34 @@ private:
 
 // --------------------------------------------------------------------------------------------------------------------
 
-struct carla_param_data {
-    uint32_t hints = 0;
-    float value = 0.f;
-    float def = 0.f;
-    float min = 0.f;
-    float max = 1.f;
-    float step = 0.01f;
-    CarlaString name;
-    CarlaString symbol;
-    CarlaString unit;
-};
-
 struct carla_bridge {
     BridgeAudioPool          audiopool; // fShmAudioPool
     BridgeRtClientControl    rtClientCtrl; // fShmRtClientControl
     BridgeNonRtClientControl nonRtClientCtrl; // fShmNonRtClientControl
     BridgeNonRtServerControl nonRtServerCtrl; // fShmNonRtServerControl
 
-    CarlaPluginBridgeThread thread;
+    bool timedOut = false;
 
-    // init sem/shm
     bool init(uint32_t bufferSize, double sampleRate);
     void cleanup();
+
+    bool start(PluginType type,
+               const char* binaryArchName,
+               const char* bridgeBinary,
+               const char* label,
+               const char* filename,
+               int64_t uniqueId);
+    bool isRunning() const;
+
+    // waits on RT client, making sure it is still active
+    void wait(const char* action, uint msecs);
+
+    void activate();
+    void deactivate();
+
+private:
+    char shmIdsStr[6*4+1] = {};
+    CarlaPluginBridgeThread thread;
 };
-
-// --------------------------------------------------------------------------------------------------------------------
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-void carla_bridge_destroy(struct carla_bridge *bridge);
-
-void carla_bridge_activate(struct carla_bridge *bridge);
-void carla_bridge_deactivate(struct carla_bridge *bridge);
-
-#ifdef __cplusplus
-}
-#endif
 
 // --------------------------------------------------------------------------------------------------------------------
