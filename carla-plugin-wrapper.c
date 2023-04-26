@@ -309,7 +309,7 @@ struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode
 
     {
         NativeTimeInfo timeInfo = {
-            .usecs = os_gettime_ns() * 1000,
+            .usecs = os_gettime_ns() / 1000,
         };
         priv->timeInfo = timeInfo;
     }
@@ -381,7 +381,7 @@ void carla_priv_deactivate(struct carla_priv *priv)
 
 void carla_priv_process_audio(struct carla_priv *priv, float *buffers[2], uint32_t frames)
 {
-    priv->timeInfo.usecs = os_gettime_ns() * 1000;
+    priv->timeInfo.usecs = os_gettime_ns() / 1000;
     priv->descriptor->process(priv->handle, buffers, buffers, frames, NULL, 0);
 }
 

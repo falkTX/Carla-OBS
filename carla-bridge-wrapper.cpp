@@ -694,6 +694,8 @@ void carla_priv_process_audio(struct carla_priv *priv, float *buffers[2], uint32
     if (!priv->bridge.isRunning())
         return;
 
+    priv->bridge.rtClientCtrl.data->timeInfo.usecs = os_gettime_ns() / 1000;
+
     for (uint32_t c=0; c < 2; ++c)
         carla_copyFloats(priv->bridge.audiopool.data + (c * priv->bufferSize), buffers[c], frames);
 
@@ -704,7 +706,6 @@ void carla_priv_process_audio(struct carla_priv *priv, float *buffers[2], uint32
     }
 
     priv->bridge.wait("process", 1000);
-
 }
 
 void carla_priv_idle(struct carla_priv *priv)
@@ -926,7 +927,34 @@ bool carla_priv_load_file_callback(obs_properties_t *props, obs_property_t *prop
 
     if (filename == NULL)
         return false;
-    return false;
+
+    priv->bridge.cleanup();
+    priv->bridge.init(priv->bufferSize, priv->sampleRate);
+
+    priv->loaded = false;
+
+    // FIXME put in the correct types
+    priv->bridge.start(PLUGIN_VST2,
+                       "x86_64",
+                       "/usr/lib/carla/carla-bridge-native",
+                       "",
+                       filename,
+                       0);
+
+    for (;priv->bridge.isRunning();)
+    {
+        carla_priv_idle(priv);
+
+        if (priv->loaded)
+            break;
+
+        carla_msleep(5);
+    }
+
+    priv->bridge.nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientActivate);
+    priv->bridge.nonRtClientCtrl.commitWrite();
+
+    return carla_post_load_callback(priv, props);
 }
 
 bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *property, void *data)

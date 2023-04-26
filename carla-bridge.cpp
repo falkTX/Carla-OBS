@@ -17,115 +17,17 @@
 
 // --------------------------------------------------------------------------------------------------------------------
 
-CarlaPluginBridgeThread::CarlaPluginBridgeThread() noexcept : CarlaThread("CarlaPluginBridgeThread")
+static void stopProcess(water::ChildProcess* const process)
 {
-}
-
-void CarlaPluginBridgeThread::setData(const PluginType type,
-                                      const char* const binaryArchName,
-                                      const char* const bridgeBinary,
-                                      const char* const label,
-                                      const char* const filename,
-                                      const int64_t uniqueId,
-                                      const char* const shmIds) noexcept
-{
-    CARLA_SAFE_ASSERT_RETURN(bridgeBinary != nullptr && bridgeBinary[0] != '\0',);
-    CARLA_SAFE_ASSERT_RETURN(shmIds != nullptr && shmIds[0] != '\0',);
-    CARLA_SAFE_ASSERT(! isThreadRunning());
-
-    fPluginType = type;
-    fPluginUniqueId = uniqueId;
-    fBinaryArchName = binaryArchName;
-    fBridgeBinary = bridgeBinary;
-    fShmIds = shmIds;
-
-    if (label != nullptr)
-        fPluginLabel = label;
-    if (fPluginLabel.isEmpty())
-        fPluginLabel = "(none)";
-
-    if (filename != nullptr)
-        fPluginFilename = filename;
-    if (fPluginFilename.isEmpty())
-        fPluginFilename = "(none)";
-}
-
-void CarlaPluginBridgeThread::run()
-{
-    if (fProcess == nullptr)
-    {
-        fProcess = new water::ChildProcess();
-    }
-    else if (fProcess->isRunning())
-    {
-        carla_stderr("CarlaPluginBridgeThread::run() - already running");
-    }
-
-    char strBuf[STR_MAX+1];
-    strBuf[STR_MAX] = '\0';
-
-    // setup binary arch
-    water::ChildProcess::Type childType;
-#ifdef CARLA_OS_MAC
-    if (fBinaryArchName == "arm64")
-        childType = water::ChildProcess::TypeARM;
-    else if (fBinaryArchName == "x86_64")
-        childType = water::ChildProcess::TypeIntel;
-    else
-#endif
-        childType = water::ChildProcess::TypeAny;
-
-    water::StringArray arguments;
-
-    // bridge binary
-    arguments.add(fBridgeBinary);
-
-    // plugin type
-    arguments.add(getPluginTypeAsString(fPluginType));
-
-    // filename
-    arguments.add(fPluginFilename);
-
-    // label
-    arguments.add(fPluginLabel);
-
-    // uniqueId
-    arguments.add(water::String(static_cast<water::int64>(fPluginUniqueId)));
-
-    bool started;
-
-    {
-        const CarlaScopedEnvVar sev("ENGINE_BRIDGE_SHM_IDS", fShmIds.toRawUTF8());
-
-        carla_stdout("Starting plugin bridge, command is:\n%s \"%s\" \"%s\" \"%s\" " P_INT64,
-                        fBridgeBinary.toRawUTF8(),
-                        getPluginTypeAsString(fPluginType),
-                        fPluginFilename.toRawUTF8(),
-                        fPluginLabel.toRawUTF8(),
-                        fPluginUniqueId);
-
-        started = fProcess->start(arguments, childType);
-    }
-
-    if (! started)
-    {
-        carla_stdout("failed!");
-        fProcess = nullptr;
-        return;
-    }
-
-    for (; fProcess->isRunning() && ! shouldThreadExit();)
-        carla_sleep(1);
-
     // we only get here if bridge crashed or thread asked to exit
-    if (fProcess->isRunning() && shouldThreadExit())
+    if (process->isRunning())
     {
-        fProcess->waitForProcessToFinish(2000);
+        process->waitForProcessToFinish(2000);
 
-        if (fProcess->isRunning())
+        if (process->isRunning())
         {
             carla_stdout("CarlaPluginBridgeThread::run() - bridge refused to close, force kill now");
-            fProcess->kill();
+            process->kill();
         }
         else
         {
@@ -135,7 +37,7 @@ void CarlaPluginBridgeThread::run()
     else
     {
         // forced quit, may have crashed
-        if (fProcess->getExitCodeAndClearPID() != 0)
+        if (process->getExitCodeAndClearPID() != 0)
         {
             carla_stderr("CarlaPluginBridgeThread::run() - bridge crashed");
 
@@ -144,8 +46,6 @@ void CarlaPluginBridgeThread::run()
                                     "Please remove this plugin, and not rely on it from this point.");
         }
     }
-
-    fProcess = nullptr;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -205,6 +105,10 @@ bool carla_bridge::init(uint32_t bufferSize, double sampleRate)
     rtClientCtrl.writeULong(static_cast<uint64_t>(audiopool.dataSize));
     rtClientCtrl.commitWrite();
 
+    rtClientCtrl.writeOpcode(kPluginBridgeRtClientSetBufferSize);
+    rtClientCtrl.writeUInt(bufferSize);
+    rtClientCtrl.commitWrite();
+
     carla_zeroStruct(shmIdsStr);
     std::strncpy(shmIdsStr+6*0, &audiopool.filename[audiopool.filename.length()-6], 6);
     std::strncpy(shmIdsStr+6*1, &rtClientCtrl.filename[rtClientCtrl.filename.length()-6], 6);
@@ -228,18 +132,22 @@ fail1:
 
 void carla_bridge::cleanup()
 {
-    if (thread.isThreadRunning())
+    if (process != nullptr)
     {
-        nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientQuit);
-        nonRtClientCtrl.commitWrite();
+        if (process->isRunning())
+        {
+            nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientQuit);
+            nonRtClientCtrl.commitWrite();
 
-        rtClientCtrl.writeOpcode(kPluginBridgeRtClientQuit);
-        rtClientCtrl.commitWrite();
+            rtClientCtrl.writeOpcode(kPluginBridgeRtClientQuit);
+            rtClientCtrl.commitWrite();
 
-        if (! timedOut)
-            wait("stopping", 3000);
+            if (! timedOut)
+                wait("stopping", 3000);
+        }
 
-        thread.stopThread(3000);
+        stopProcess(process);
+        process = nullptr;
     }
 
     nonRtServerCtrl.clear();
@@ -248,20 +156,85 @@ void carla_bridge::cleanup()
     audiopool.clear();
 }
 
-bool carla_bridge::start(PluginType type,
-            const char* binaryArchName,
-            const char* bridgeBinary,
-            const char* label,
-            const char* filename,
-            int64_t uniqueId)
+bool carla_bridge::start(const PluginType type,
+                         const char* const binaryArchName,
+                         const char* const bridgeBinary,
+                         const char* label,
+                         const char* filename,
+                         const int64_t uniqueId)
 {
-    thread.setData(type, binaryArchName, bridgeBinary, label, filename, uniqueId, shmIdsStr);
-    return thread.startThread();
+    UNUSED_PARAMETER(binaryArchName);
+
+    if (process == nullptr)
+    {
+        process = new water::ChildProcess();
+    }
+    else if (process->isRunning())
+    {
+        carla_stderr("CarlaPluginBridgeThread::run() - already running");
+    }
+
+    char strBuf[STR_MAX+1];
+    strBuf[STR_MAX] = '\0';
+
+    // setup binary arch
+    water::ChildProcess::Type childType;
+#ifdef CARLA_OS_MAC
+    /**/ if (std::strcmp(binaryArchName, "arm64") == 0)
+        childType = water::ChildProcess::TypeARM;
+    else if (std::strcmp(binaryArchName == "x86_64") == 0)
+        childType = water::ChildProcess::TypeIntel;
+    else
+#endif
+        childType = water::ChildProcess::TypeAny;
+
+    // do not use null strings for label and filename
+    if (label == nullptr || label[0] == '\0')
+        label = "(none)";
+    if (filename == nullptr || filename[0] == '\0')
+        filename = "(none)";
+
+    water::StringArray arguments;
+
+    // bridge binary
+    arguments.add(bridgeBinary);
+
+    // plugin type
+    arguments.add(getPluginTypeAsString(type));
+
+    // filename
+    arguments.add(filename);
+
+    // label
+    arguments.add(label);
+
+    // uniqueId
+    arguments.add(water::String(static_cast<water::int64>(uniqueId)));
+
+    bool started;
+
+    {
+        const CarlaScopedEnvVar sev("ENGINE_BRIDGE_SHM_IDS", shmIdsStr);
+
+        carla_stdout("Starting plugin bridge, command is:\n%s \"%s\" \"%s\" \"%s\" " P_INT64,
+                     bridgeBinary, getPluginTypeAsString(type), filename, label, uniqueId);
+
+        started = process->start(arguments, childType);
+    }
+
+    if (! started)
+    {
+        carla_stdout("failed!");
+        process = nullptr;
+        return false;
+    }
+
+    return true;
 }
 
 bool carla_bridge::isRunning() const
 {
-    return thread.isThreadRunning();
+    return process != nullptr && process->isRunning();
 }
 
 void carla_bridge::wait(const char* const action, const uint msecs)
@@ -287,7 +260,9 @@ void carla_bridge::activate()
         nonRtClientCtrl.commitWrite();
     }
 
-    if (thread.isThreadRunning())
+    timedOut = false;
+
+    if (isRunning())
     {
         try {
             wait("activate", 2000);
@@ -306,7 +281,7 @@ void carla_bridge::deactivate()
 
     // timedOut = false;
 
-    if (thread.isThreadRunning())
+    if (isRunning())
     {
         try {
             wait("deactivate", 2000);
