@@ -82,7 +82,7 @@ void remove_all_props(obs_properties_t *props, obs_data_t *settings)
 extern "C" {
 #endif
 
-struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode bufsize, uint32_t srate, bool filter);
+struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode bufsize, uint32_t srate);
 void carla_priv_destroy(struct carla_priv *carla);
 
 void carla_priv_activate(struct carla_priv *carla);

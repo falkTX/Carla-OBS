@@ -271,6 +271,8 @@ bool carla_bridge::idle()
     {
 //         fTimedOut   = true;
 //         fTimedError = true;
+        printf("bridge closed by itself!\n");
+        activated = false;
         ready = false;
         stopProcess(childprocess);
         childprocess = nullptr;
@@ -487,7 +489,7 @@ bool carla_bridge::idle()
                 const float def      = nonRtServerCtrl.readFloat();
                 const float min      = nonRtServerCtrl.readFloat();
                 const float max      = nonRtServerCtrl.readFloat();
-                const float step      = nonRtServerCtrl.readFloat();
+                const float step     = nonRtServerCtrl.readFloat();
                 nonRtServerCtrl.readFloat();
                 nonRtServerCtrl.readFloat();
 
@@ -819,18 +821,17 @@ void carla_bridge::activate()
 {
     assert(!activated);
     activated = true;
-
-    {
-        const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
-
-        nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientActivate);
-        nonRtClientCtrl.commitWrite();
-    }
-
     timedOut = false;
 
     if (isRunning())
     {
+        {
+            const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
+
+            nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientActivate);
+            nonRtClientCtrl.commitWrite();
+        }
+
         try {
             wait("activate", 2000);
         } CARLA_SAFE_EXCEPTION("activate - waitForClient");
@@ -841,18 +842,17 @@ void carla_bridge::deactivate()
 {
     assert(activated);
     activated = false;
-
-    {
-        const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
-
-        nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientDeactivate);
-        nonRtClientCtrl.commitWrite();
-    }
-
     // timedOut = false;
 
     if (isRunning())
     {
+        {
+            const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
+
+            nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientDeactivate);
+            nonRtClientCtrl.commitWrite();
+        }
+
         try {
             wait("deactivate", 2000);
         } CARLA_SAFE_EXCEPTION("deactivate - waitForClient");
@@ -861,6 +861,8 @@ void carla_bridge::deactivate()
 
 void carla_bridge::process(float *buffers[2], uint32_t frames)
 {
+    CARLA_SAFE_ASSERT_RETURN(activated,);
+
     if (!isRunning())
         return;
 

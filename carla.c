@@ -5,6 +5,12 @@
  */
 
 #include "carla-wrapper.h"
+#include <util/platform.h>
+
+// for audio generator thread
+#include <threads.h>
+#include <unistd.h>
+#include <time.h>
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -13,8 +19,15 @@ struct carla_data {
     struct carla_priv *priv;
 
     // current OBS config
+    bool activated;
     size_t channels;
     uint32_t sample_rate;
+    obs_source_t *source;
+
+    // audio generator thread
+    bool audiogen_enabled;
+    volatile bool audiogen_running;
+    thrd_t audiogen_thread;
 
     // internal buffering
     float* buffers[MAX_AV_PLANES];
@@ -26,6 +39,46 @@ struct carla_data {
 // --------------------------------------------------------------------------------------------------------------------
 // private methods
 
+static int carla_obs_audio_gen_thread(void *data)
+{
+    struct carla_data *carla = data;
+
+    struct obs_source_audio out = {
+        .speakers = SPEAKERS_STEREO,
+        .format = AUDIO_FORMAT_FLOAT_PLANAR,
+        .samples_per_sec = carla->sample_rate,
+    };
+
+    for (uint8_t c=0; c<MAX_AV_PLANES; ++c)
+        out.data[c] = (const uint8_t *)carla->buffers[c];
+
+    const uint32_t sample_rate = carla->sample_rate;
+
+    uint64_t start_time = out.timestamp = os_gettime_ns();
+    uint64_t total_samples = 0;
+
+    while (carla->audiogen_running)
+    {
+        const uint32_t buffer_size = carla->buffer_size_mode == buffer_size_static_128 ? 128
+                                   : carla->buffer_size_mode == buffer_size_static_256 ? 256
+                                   : MAX_AUDIO_BUFFER_SIZE;
+
+        out.frames = buffer_size;
+        carla_priv_process_audio(carla->priv, carla->buffers, buffer_size);
+        obs_source_output_audio(carla->source, &out);
+
+        if (!carla->audiogen_running)
+            break;
+
+        total_samples += buffer_size;
+        out.timestamp = start_time + audio_frames_to_ns(sample_rate, total_samples);
+
+        os_sleepto_ns_fast(out.timestamp);
+    }
+
+    return thrd_success;
+}
+
 static void carla_obs_idle_callback(void *data, float unused)
 {
     UNUSED_PARAMETER(unused);
@@ -35,6 +88,9 @@ static void carla_obs_idle_callback(void *data, float unused)
 
 // --------------------------------------------------------------------------------------------------------------------
 // obs plugin methods
+
+static void carla_obs_activate(void *data);
+static void carla_obs_deactivate(void *data);
 
 static const char *carla_obs_get_name(void *data)
 {
@@ -64,19 +120,27 @@ static void *carla_obs_create(obs_data_t *settings, obs_source_t *source, bool i
             goto fail1;
     }
 
-    struct carla_priv *priv = carla_priv_create(source, buffer_size_static_128, sample_rate, isFilter);
+    struct carla_priv *priv = carla_priv_create(source, buffer_size_dynamic, sample_rate);
     if (carla == NULL)
         goto fail2;
 
     carla->priv = priv;
+    carla->source = source;
     carla->channels = channels;
     carla->sample_rate = sample_rate;
 
     carla->buffer_head = 0;
     carla->buffer_tail = UINT16_MAX;
-    carla->buffer_size_mode = buffer_size_static_128;
+    carla->buffer_size_mode = buffer_size_dynamic;
+
+    if (!isFilter)
+    {
+        carla->audiogen_enabled = true;
+    }
 
     obs_add_tick_callback(carla_obs_idle_callback, carla);
+
+    carla_obs_activate(carla);
 
     return carla;
 
@@ -103,6 +167,10 @@ static void carla_obs_destroy(void *data)
 {
     struct carla_data *carla = data;
     obs_remove_tick_callback(carla_obs_idle_callback, carla);
+
+    if (carla->activated)
+        carla_obs_deactivate(carla);
+
     carla_priv_destroy(carla->priv);
     for (uint8_t c=0; c<MAX_AV_PLANES; ++c)
         bfree(carla->buffers[c]);
@@ -129,18 +197,37 @@ static obs_properties_t *carla_obs_get_properties(void *data)
 static void carla_obs_activate(void *data)
 {
     struct carla_data *carla = data;
+    assert(!carla->activated);
+    carla->activated = true;
+
     carla_priv_activate(carla->priv);
+
+    if (carla->audiogen_enabled)
+    {
+        assert(!carla->audiogen_running);
+        carla->audiogen_running = true;
+        thrd_create(&carla->audiogen_thread, carla_obs_audio_gen_thread, carla);
+    }
 }
 
 static void carla_obs_deactivate(void *data)
 {
     struct carla_data *carla = data;
+    assert(carla->activated);
+    carla->activated = false;
+
+    if (carla->audiogen_running)
+    {
+        carla->audiogen_running = false;
+        thrd_join(carla->audiogen_thread, NULL);
+    }
+
     carla_priv_deactivate(carla->priv);
 }
 
 static void carla_obs_filter_audio_dynamic(struct carla_data *carla, struct obs_audio_data *audio)
 {
-    float *obsbuffers[MAX_AV_PLANES] = {NULL};
+    float *obsbuffers[MAX_AV_PLANES];
 
     for (uint8_t c=0; c<MAX_AV_PLANES; ++c)
         obsbuffers[c] = (float *)audio->data[c];

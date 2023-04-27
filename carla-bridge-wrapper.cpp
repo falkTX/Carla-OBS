@@ -51,7 +51,7 @@ struct carla_priv : carla_bridge_callback {
 // --------------------------------------------------------------------------------------------------------------------
 // carla + obs integration methods
 
-struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode bufsize, uint32_t srate, bool filter)
+struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode bufsize, uint32_t srate)
 {
     struct carla_priv *priv = new struct carla_priv;
     if (priv == NULL)
