@@ -769,16 +769,17 @@ bool carla_bridge::idle()
     return true;
 }
 
-void carla_bridge::wait(const char* const action, const uint msecs)
+bool carla_bridge::wait(const char* const action, const uint msecs)
 {
-        CARLA_SAFE_ASSERT_RETURN(! timedOut,);
+        CARLA_SAFE_ASSERT_RETURN(! timedOut, false);
 //         CARLA_SAFE_ASSERT_RETURN(! fTimedError,);
 
     if (rtClientCtrl.waitForClient(msecs))
-        return;
+        return true;
 
     timedOut = true;
     carla_stderr2("waitForClient(%s) timed out", action);
+    return false;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -877,5 +878,9 @@ void carla_bridge::process(float *buffers[2], uint32_t frames)
         rtClientCtrl.commitWrite();
     }
 
-    wait("process", 1000);
+    if (wait("process", 1000))
+    {
+        for (uint32_t c=0; c < 2; ++c)
+            carla_copyFloats(buffers[c], audiopool.data + ((c + fInfo.aIns) * bufferSize), frames);
+    }
 }

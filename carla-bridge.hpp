@@ -155,7 +155,7 @@ struct carla_bridge {
     bool idle();
 
     // waits on RT client, making sure it is still active
-    void wait(const char* action, uint msecs);
+    bool wait(const char* action, uint msecs);
 
     void set_value(uint index, float value);
     void show_ui();
