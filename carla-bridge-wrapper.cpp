@@ -59,7 +59,7 @@ struct carla_priv *carla_priv_create(obs_source_t *source, enum buffer_size_mode
 
     priv->bridge.callback = priv;
     priv->source = source;
-    priv->bufferSize = MAX_AUDIO_BUFFER_SIZE; // bufsize_mode_to_frames(bufsize);
+    priv->bufferSize = bufsize_mode_to_frames(bufsize);
     priv->sampleRate = srate;
 
     assert(priv->bufferSize != 0);
@@ -285,19 +285,14 @@ bool carla_priv_load_file_callback(obs_properties_t *props, obs_property_t *prop
     priv->bridge.cleanup();
     priv->bridge.init(priv->bufferSize, priv->sampleRate);
 
-    // FIXME put in the correct types
+    // TODO put in the correct types
+    // TODO show error message if bridge fails
     priv->bridge.start(PLUGIN_VST2,
                        "x86_64",
                        "/usr/lib/carla/carla-bridge-native",
                        "",
                        filename,
                        0);
-
-    while (priv->bridge.isRunning() && priv->bridge.idle() && !priv->bridge.isReady())
-        carla_msleep(5);
-
-    // priv->bridge.nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientActivate);
-    // priv->bridge.nonRtClientCtrl.commitWrite();
 
     return carla_post_load_callback(priv, props);
 }
@@ -316,18 +311,13 @@ bool carla_priv_select_plugin_callback(obs_properties_t *props, obs_property_t *
     priv->bridge.cleanup();
     priv->bridge.init(priv->bufferSize, priv->sampleRate);
 
+    // TODO show error message if bridge fails
     priv->bridge.start((PluginType)plugin->type,
                        "x86_64",
                        "/usr/lib/carla/carla-bridge-native",
                        plugin->label,
                        plugin->filename,
                        plugin->uniqueId);
-
-    while (priv->bridge.isRunning() && priv->bridge.idle() && !priv->bridge.isReady())
-        carla_msleep(5);
-
-    // priv->bridge.nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientActivate);
-    // priv->bridge.nonRtClientCtrl.commitWrite();
 
     return carla_post_load_callback(priv, props);
 }

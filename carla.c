@@ -14,12 +14,13 @@ struct carla_data {
 
     // current OBS config
     size_t channels;
-    uint32_t sampleRate;
+    uint32_t sample_rate;
 
     // internal buffering
-    enum buffer_size_mode bufferSizeMode;
-    uint32_t bufferPos;
-    float *abuffer1, *abuffer2;
+    float* buffers[MAX_AV_PLANES];
+    uint16_t buffer_head;
+    uint16_t buffer_tail;
+    enum buffer_size_mode buffer_size_mode;
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -47,43 +48,41 @@ static void *carla_obs_create(obs_data_t *settings, obs_source_t *source, bool i
 
     const audio_t *audio = obs_get_audio();
     const size_t channels = audio_output_get_channels(audio);
-    const uint32_t sampleRate = audio_output_get_sample_rate(audio);
+    const uint32_t sample_rate = audio_output_get_sample_rate(audio);
 
-    if (channels == 0 || sampleRate == 0)
+    if (channels == 0 || sample_rate == 0)
         return NULL;
 
     struct carla_data *carla = bzalloc(sizeof(*carla));
     if (carla == NULL)
         return NULL;
 
-    carla->abuffer1 = bzalloc(sizeof(float) * MAX_AUDIO_BUFFER_SIZE);
-    if (carla->abuffer1 == NULL)
-        goto fail1;
+    for (uint8_t c=0; c<MAX_AV_PLANES; ++c)
+    {
+        carla->buffers[c] = bzalloc(sizeof(float) * MAX_AUDIO_BUFFER_SIZE);
+        if (carla->buffers[c] == NULL)
+            goto fail1;
+    }
 
-    carla->abuffer2 = bzalloc(sizeof(float) * MAX_AUDIO_BUFFER_SIZE);
-    if (carla->abuffer2 == NULL)
-        goto fail2;
-
-    struct carla_priv *priv = carla_priv_create(source, buffer_size_dynamic, sampleRate, isFilter);
+    struct carla_priv *priv = carla_priv_create(source, buffer_size_static_128, sample_rate, isFilter);
     if (carla == NULL)
-        goto fail3;
+        goto fail2;
 
     carla->priv = priv;
     carla->channels = channels;
-    carla->sampleRate = sampleRate;
+    carla->sample_rate = sample_rate;
 
-    carla->bufferPos = 0;
-    carla->bufferSizeMode = buffer_size_dynamic;
+    carla->buffer_head = 0;
+    carla->buffer_tail = UINT16_MAX;
+    carla->buffer_size_mode = buffer_size_static_128;
 
     obs_add_tick_callback(carla_obs_idle_callback, carla);
 
     return carla;
 
-fail3:
-    bfree(carla->abuffer2);
-
 fail2:
-    bfree(carla->abuffer1);
+    for (uint8_t c=0; c<MAX_AV_PLANES; ++c)
+        bfree(carla->buffers[c]);
 
 fail1:
     bfree(carla);
@@ -105,8 +104,8 @@ static void carla_obs_destroy(void *data)
     struct carla_data *carla = data;
     obs_remove_tick_callback(carla_obs_idle_callback, carla);
     carla_priv_destroy(carla->priv);
-    bfree(carla->abuffer2);
-    bfree(carla->abuffer1);
+    for (uint8_t c=0; c<MAX_AV_PLANES; ++c)
+        bfree(carla->buffers[c]);
     bfree(carla);
 }
 
@@ -141,58 +140,78 @@ static void carla_obs_deactivate(void *data)
 
 static void carla_obs_filter_audio_dynamic(struct carla_data *carla, struct obs_audio_data *audio)
 {
-    float *obsbuffers[MAX_AV_PLANES];
-    {
-        for (uint32_t i=0; i<MAX_AV_PLANES; ++i)
-            obsbuffers[i] = (float *)audio->data[i];
-    }
+    float *obsbuffers[MAX_AV_PLANES] = {NULL};
+
+    for (uint8_t c=0; c<MAX_AV_PLANES; ++c)
+        obsbuffers[c] = (float *)audio->data[c];
 
     carla_priv_process_audio(carla->priv, obsbuffers, audio->frames);
 }
 
 static void carla_obs_filter_audio_static(struct carla_data *carla, struct obs_audio_data *audio)
 {
-    const uint32_t bufferSize = carla->bufferSizeMode == buffer_size_static_128 ? 128
-                              : carla->bufferSizeMode == buffer_size_static_256 ? 256
-                              : MAX_AUDIO_BUFFER_SIZE;
+    const uint32_t buffer_size = carla->buffer_size_mode == buffer_size_static_128 ? 128
+                               : carla->buffer_size_mode == buffer_size_static_256 ? 256
+                               : MAX_AUDIO_BUFFER_SIZE;
+    const uint32_t frames = audio->frames;
 
-    /* TODO
-    float *carlabuffers[2] = { carla->abuffer1, carla->abuffer2 };
+    // cast audio buffers to correct type
     float *obsbuffers[MAX_AV_PLANES];
+
+    for (uint8_t c=0; c<MAX_AV_PLANES; ++c)
+        obsbuffers[c] = (float *)audio->data[c];
+
+    // preload some variables before looping section
+    uint16_t buffer_head = carla->buffer_head;
+    uint16_t buffer_tail = carla->buffer_tail;
+
+    for (uint32_t i=0, h, t; i<frames; ++i)
     {
-        for (uint32_t i=0; i<MAX_AV_PLANES; ++i)
-            obsbuffers[i] = (float *)audio->data[i];
-        for (uint32_t i=0; i<MAX_AV_PLANES; ++i)
-            obsbuffers[i] = (float *)audio->data[i];
-    }
+        // OBS -> plugin internal buffering
+        h = buffer_head++;
 
-    uint32_t bufferPos = carla->bufferPos;
+        for (uint8_t c=0; c<carla->channels; ++c)
+            carla->buffers[c][h] = obsbuffers[c][i];
 
-    for (uint32_t i=0, j; i<frames; ++i)
-    {
-        j = bufferPos++;
-        carlabuffers[0][j] = obsbuffers[0][i];
-        carlabuffers[1][j] = obsbuffers[1][i];
-
-        if (bufferPos == bufferSize)
+        // we reach the target buffer size, do audio processing
+        if (buffer_head == buffer_size)
         {
-            bufferPos = 0;
-            carla_priv_process_audio(carla->priv, carlabuffers, bufferSize);
+            buffer_head = 0;
+            carla_priv_process_audio(carla->priv, carla->buffers, buffer_size);
+
+            // we can now begin to copy back the buffer into OBS
+            if (buffer_tail == UINT16_MAX)
+                buffer_tail = 0;
         }
 
-        obsbuffers[1][i] = carlabuffers[1][j];
-        obsbuffers[0][i] = carlabuffers[0][j];
+        if (buffer_tail == UINT16_MAX)
+        {
+            // buffering still taking place, skip until first audio cycle
+            for (uint8_t c=0; c<carla->channels; ++c)
+                obsbuffers[c][i] = 0.f;
+        }
+        else
+        {
+            // plugin -> OBS buffer copy
+            t = buffer_tail++;
+
+            for (uint8_t c=0; c<carla->channels; ++c)
+                obsbuffers[c][i] = carla->buffers[c][t];
+
+            if (buffer_tail == buffer_size)
+                buffer_tail = 0;
+        }
     }
 
-    carla->bufferPos = bufferPos;
-    */
+    carla->buffer_head = buffer_head;
+    carla->buffer_tail = buffer_tail;
 }
 
 static struct obs_audio_data *carla_obs_filter_audio(void *data, struct obs_audio_data *audio)
 {
     struct carla_data *carla = data;
 
-    switch (carla->bufferSizeMode)
+    switch (carla->buffer_size_mode)
     {
     case buffer_size_dynamic:
         carla_obs_filter_audio_dynamic(carla, audio);

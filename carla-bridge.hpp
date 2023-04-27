@@ -166,6 +166,7 @@ struct carla_bridge {
 
 private:
     char shmIdsStr[6*4+1] = {};
+    bool activated = false;
     bool ready = false;
     bool timedOut = false;
     uint32_t bufferSize = 0;

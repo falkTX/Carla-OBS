@@ -233,7 +233,16 @@ bool carla_bridge::start(const PluginType type,
         return false;
     }
 
-    return true;
+    while (isRunning() && idle() && !ready)
+        carla_msleep(5);
+
+    if (ready && activated)
+    {
+        nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientActivate);
+        nonRtClientCtrl.commitWrite();
+    }
+
+    return ready;
 }
 
 bool carla_bridge::isRunning() const
@@ -808,6 +817,9 @@ void carla_bridge::show_ui()
 
 void carla_bridge::activate()
 {
+    assert(!activated);
+    activated = true;
+
     {
         const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
 
@@ -827,6 +839,9 @@ void carla_bridge::activate()
 
 void carla_bridge::deactivate()
 {
+    assert(activated);
+    activated = false;
+
     {
         const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
 
