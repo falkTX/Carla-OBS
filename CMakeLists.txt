@@ -9,6 +9,10 @@ if(NOT WIN32)
   pkg_check_modules(LIBMAGIC "libmagic")
 endif()
 
+if(NOT (APPLE OR WIN32))
+  set(CARLA_EXTRA_LIBS "dl" "rt")
+endif()
+
 add_library(carla MODULE)
 add_library(OBS::carla ALIAS carla)
 
@@ -62,6 +66,7 @@ target_link_libraries(carla PRIVATE
   Qt::Core
   Qt::Gui
   Qt::Widgets
+  ${CARLA_EXTRA_LIBS}
   ${LIBMAGIC_LIBRARIES}
 )
 
