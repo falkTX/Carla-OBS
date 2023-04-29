@@ -30,7 +30,7 @@ target_compile_definitions(carla PRIVATE
   #CARLA_LIB_EXT=".so"
   STATIC_PLUGIN_TARGET
   REAL_BUILD
-  $<${LIBMAGIC_FOUND}:HAVE_LIBMAGIC>
+  # $<${LIBMAGIC_FOUND}:HAVE_LIBMAGIC>
 )
 
 target_compile_options(carla PRIVATE
