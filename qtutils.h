@@ -15,12 +15,14 @@ extern "C" {
 typedef struct QMainWindow QMainWindow;
 #endif
 
-void carla_qt_callback_on_main_thread(void (*callback)(void *param), void *param);
+void carla_qt_callback_on_main_thread(void (*callback)(void *param),
+				      void *param);
 
-const char* carla_qt_file_dialog(bool save, bool isDir, const char *title, const char *filter);
+const char *carla_qt_file_dialog(bool save, bool isDir, const char *title,
+				 const char *filter);
 
 uintptr_t carla_qt_get_main_window_id(void);
-QMainWindow* carla_qt_get_main_window(void);
+QMainWindow *carla_qt_get_main_window(void);
 double carla_qt_get_scale_factor(void);
 
 #ifdef __cplusplus

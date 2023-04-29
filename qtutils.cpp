@@ -10,57 +10,65 @@
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QFileDialog>
 
-void carla_qt_callback_on_main_thread(void (*callback)(void *param), void *param)
+void carla_qt_callback_on_main_thread(void (*callback)(void *param),
+				      void *param)
 {
-    QTimer *const maintimer = new QTimer;
-    maintimer->moveToThread(qApp->thread());
-    maintimer->setSingleShot(true);
-    QObject::connect(maintimer, &QTimer::timeout, [maintimer, callback, param]() {
-        callback(param);
-        maintimer->deleteLater();
-    });
-    QMetaObject::invokeMethod(maintimer, "start", Qt::QueuedConnection, Q_ARG(int, 0));
+	QTimer *const maintimer = new QTimer;
+	maintimer->moveToThread(qApp->thread());
+	maintimer->setSingleShot(true);
+	QObject::connect(maintimer, &QTimer::timeout,
+			 [maintimer, callback, param]() {
+				 callback(param);
+				 maintimer->deleteLater();
+			 });
+	QMetaObject::invokeMethod(maintimer, "start", Qt::QueuedConnection,
+				  Q_ARG(int, 0));
 }
 
-const char* carla_qt_file_dialog(bool save, bool isDir, const char *title, const char *filter)
+const char *carla_qt_file_dialog(bool save, bool isDir, const char *title,
+				 const char *filter)
 {
-    static QByteArray ret;
+	static QByteArray ret;
 
-    QWidget *parent = carla_qt_get_main_window();
-    QFileDialog::Options options;
+	QWidget *parent = carla_qt_get_main_window();
+	QFileDialog::Options options;
 
-    if (isDir)
-        options |= QFileDialog::ShowDirsOnly;
+	if (isDir)
+		options |= QFileDialog::ShowDirsOnly;
 
-    ret = save ? QFileDialog::getSaveFileName(parent, title, {}, filter, nullptr, options).toUtf8()
-               : QFileDialog::getOpenFileName(parent, title, {}, filter, nullptr, options).toUtf8();
+	ret = save ? QFileDialog::getSaveFileName(parent, title, {}, filter,
+						  nullptr, options)
+			      .toUtf8()
+		   : QFileDialog::getOpenFileName(parent, title, {}, filter,
+						  nullptr, options)
+			      .toUtf8();
 
-    return ret.constData();
+	return ret.constData();
 }
 
 uintptr_t carla_qt_get_main_window_id(void)
 {
-    if (QMainWindow *mw = carla_qt_get_main_window())
-        return mw->winId();
+	if (QMainWindow *mw = carla_qt_get_main_window())
+		return mw->winId();
 
-    return 0;
+	return 0;
 }
 
-QMainWindow* carla_qt_get_main_window(void)
+QMainWindow *carla_qt_get_main_window(void)
 {
-    for (QWidget *w : QApplication::topLevelWidgets())
-    {
-        if (QMainWindow *mw = qobject_cast<QMainWindow*>(w))
-            return mw;
-    }
+	for (QWidget *w : QApplication::topLevelWidgets()) {
+		if (QMainWindow *mw = qobject_cast<QMainWindow *>(w))
+			return mw;
+	}
 
-    return nullptr;
+	return nullptr;
 }
 
 double carla_qt_get_scale_factor(void)
 {
-    if (QMainWindow *mw = carla_qt_get_main_window())
-        return mw->devicePixelRatioF();;
+	if (QMainWindow *mw = carla_qt_get_main_window())
+		return mw->devicePixelRatioF();
+	;
 
-    return 1.0;
+	return 1.0;
 }
