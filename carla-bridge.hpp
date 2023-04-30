@@ -157,6 +157,7 @@ private:
 	char shmIdsStr[6 * 4 + 1] = {};
 	bool activated = false;
 	bool ready = false;
+	bool saved = false;
 	bool timedOut = false;
 	uint32_t bufferSize = 0;
 
@@ -166,6 +167,8 @@ private:
 	BridgeNonRtServerControl nonRtServerCtrl; // fShmNonRtServerControl
 
 	CarlaScopedPointer<water::ChildProcess> childprocess;
+
+	void readMessages();
 };
 
 // --------------------------------------------------------------------------------------------------------------------

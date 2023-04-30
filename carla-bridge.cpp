@@ -271,9 +271,8 @@ bool carla_bridge::idle()
 		//         fTimedError = true;
 		printf("bridge closed by itself!\n");
 		activated = false;
-		ready = false;
-		stopProcess(childprocess);
-		childprocess = nullptr;
+		timedOut = true;
+		cleanup();
 		return false;
 	}
 
@@ -281,555 +280,9 @@ bool carla_bridge::idle()
 	//             setActive(false, true, true);
 
 	try {
-		for (; nonRtServerCtrl.isDataAvailableForReading();) {
-			const PluginBridgeNonRtServerOpcode opcode(
-				nonRtServerCtrl.readOpcode());
-			// #ifdef DEBUG
-			if (opcode != kPluginBridgeNonRtServerPong &&
-			    opcode != kPluginBridgeNonRtServerParameterValue2) {
-				carla_stdout(
-					"CarlaPluginBridge::handleNonRtData() - got opcode: %s",
-					PluginBridgeNonRtServerOpcode2str(
-						opcode));
-			}
-			// #endif
-			switch (opcode) {
-			case kPluginBridgeNonRtServerNull:
-			case kPluginBridgeNonRtServerPong:
-				break;
-
-			case kPluginBridgeNonRtServerVersion:
-				// fBridgeVersion =
-				nonRtServerCtrl.readUInt();
-				break;
-
-			case kPluginBridgeNonRtServerPluginInfo1: {
-				// uint/category, uint/hints, uint/optionsAvailable, uint/optionsEnabled, long/uniqueId
-				const uint32_t category =
-					nonRtServerCtrl.readUInt();
-				const uint32_t hints =
-					nonRtServerCtrl.readUInt();
-				const uint32_t optionAv =
-					nonRtServerCtrl.readUInt();
-				const uint32_t optionEn =
-					nonRtServerCtrl.readUInt();
-				const int64_t uniqueId =
-					nonRtServerCtrl.readLong();
-
-				//                 if (fUniqueId != 0) {
-				//                     CARLA_SAFE_ASSERT_INT2(fUniqueId == uniqueId, fUniqueId, uniqueId);
-				//                 }
-
-				//                 pData->hints   = hints | PLUGIN_IS_BRIDGE;
-				//                 pData->options = optionEn;
-
-				//                #ifdef HAVE_X11
-				//                 if (fBridgeVersion < 9 || fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
-				//                #endif
-				//                 {
-				//                     pData->hints &= ~PLUGIN_HAS_CUSTOM_EMBED_UI;
-				//                 }
-
-				//                 fInfo.category = static_cast<PluginCategory>(category);
-				//                 fInfo.optionsAvailable = optionAv;
-			} break;
-
-			case kPluginBridgeNonRtServerPluginInfo2: {
-				// uint/size, str[] (realName), uint/size, str[] (label), uint/size, str[] (maker), uint/size, str[] (copyright)
-
-				// realName
-				const uint32_t realNameSize(
-					nonRtServerCtrl.readUInt());
-				char realName[realNameSize + 1];
-				carla_zeroChars(realName, realNameSize + 1);
-				nonRtServerCtrl.readCustomData(realName,
-							       realNameSize);
-
-				// label
-				const uint32_t labelSize(
-					nonRtServerCtrl.readUInt());
-				char label[labelSize + 1];
-				carla_zeroChars(label, labelSize + 1);
-				nonRtServerCtrl.readCustomData(label,
-							       labelSize);
-
-				// maker
-				const uint32_t makerSize(
-					nonRtServerCtrl.readUInt());
-				char maker[makerSize + 1];
-				carla_zeroChars(maker, makerSize + 1);
-				nonRtServerCtrl.readCustomData(maker,
-							       makerSize);
-
-				// copyright
-				const uint32_t copyrightSize(
-					nonRtServerCtrl.readUInt());
-				char copyright[copyrightSize + 1];
-				carla_zeroChars(copyright, copyrightSize + 1);
-				nonRtServerCtrl.readCustomData(copyright,
-							       copyrightSize);
-
-				fInfo.name = realName;
-				fInfo.label = label;
-				fInfo.maker = maker;
-				fInfo.copyright = copyright;
-			} break;
-
-			case kPluginBridgeNonRtServerAudioCount: {
-				// uint/ins, uint/outs
-				fInfo.clear();
-
-				fInfo.aIns = nonRtServerCtrl.readUInt();
-				fInfo.aOuts = nonRtServerCtrl.readUInt();
-
-				if (fInfo.aIns > 0) {
-					fInfo.aInNames =
-						new const char *[fInfo.aIns];
-					carla_zeroPointers(fInfo.aInNames,
-							   fInfo.aIns);
-				}
-
-				if (fInfo.aOuts > 0) {
-					fInfo.aOutNames =
-						new const char *[fInfo.aOuts];
-					carla_zeroPointers(fInfo.aOutNames,
-							   fInfo.aOuts);
-				}
-
-			} break;
-
-			case kPluginBridgeNonRtServerMidiCount: {
-				// uint/ins, uint/outs
-				fInfo.mIns = nonRtServerCtrl.readUInt();
-				fInfo.mOuts = nonRtServerCtrl.readUInt();
-			} break;
-
-			case kPluginBridgeNonRtServerCvCount: {
-				// uint/ins, uint/outs
-				fInfo.cvIns = nonRtServerCtrl.readUInt();
-				fInfo.cvOuts = nonRtServerCtrl.readUInt();
-			} break;
-
-			case kPluginBridgeNonRtServerParameterCount: {
-				// uint/count
-				paramCount = nonRtServerCtrl.readUInt();
-
-				delete[] paramDetails;
-
-				if (paramCount != 0)
-					paramDetails =
-						new carla_param_data[paramCount];
-				else
-					paramDetails = nullptr;
-
-			} break;
-
-			case kPluginBridgeNonRtServerProgramCount: {
-				// uint/count
-				nonRtServerCtrl.readUInt();
-			} break;
-
-			case kPluginBridgeNonRtServerMidiProgramCount: {
-				// uint/count
-				nonRtServerCtrl.readUInt();
-			} break;
-
-			case kPluginBridgeNonRtServerPortName: {
-				// byte/type, uint/index, uint/size, str[] (name)
-				nonRtServerCtrl.readByte();
-				nonRtServerCtrl.readUInt();
-
-				// name
-				const uint32_t nameSize(
-					nonRtServerCtrl.readUInt());
-				char *const name = new char[nameSize + 1];
-				carla_zeroChars(name, nameSize + 1);
-				nonRtServerCtrl.readCustomData(name, nameSize);
-
-			} break;
-
-			case kPluginBridgeNonRtServerParameterData1: {
-				// uint/index, int/rindex, uint/type, uint/hints, int/cc
-				const uint32_t index =
-					nonRtServerCtrl.readUInt();
-				const int32_t rindex =
-					nonRtServerCtrl.readInt();
-				const uint32_t type =
-					nonRtServerCtrl.readUInt();
-				const uint32_t hints =
-					nonRtServerCtrl.readUInt();
-				const int16_t ctrl =
-					nonRtServerCtrl.readShort();
-
-				CARLA_SAFE_ASSERT_INT_BREAK(
-					ctrl >= CONTROL_INDEX_NONE &&
-						ctrl <= CONTROL_INDEX_MAX_ALLOWED,
-					ctrl);
-				CARLA_SAFE_ASSERT_UINT2_BREAK(
-					index < paramCount, index, paramCount);
-
-				if (type != PARAMETER_INPUT)
-					break;
-				if ((hints & PARAMETER_IS_ENABLED) == 0)
-					break;
-				if (hints & (PARAMETER_IS_READ_ONLY |
-					     PARAMETER_IS_NOT_SAVED))
-					break;
-
-				paramDetails[index].hints = hints;
-			} break;
-
-			case kPluginBridgeNonRtServerParameterData2: {
-				// uint/index, uint/size, str[] (name), uint/size, str[] (unit)
-				const uint32_t index =
-					nonRtServerCtrl.readUInt();
-
-				// name
-				const uint32_t nameSize(
-					nonRtServerCtrl.readUInt());
-				char name[nameSize + 1];
-				carla_zeroChars(name, nameSize + 1);
-				nonRtServerCtrl.readCustomData(name, nameSize);
-
-				// symbol
-				const uint32_t symbolSize(
-					nonRtServerCtrl.readUInt());
-				char symbol[symbolSize + 1];
-				carla_zeroChars(symbol, symbolSize + 1);
-				nonRtServerCtrl.readCustomData(symbol,
-							       symbolSize);
-
-				// unit
-				const uint32_t unitSize(
-					nonRtServerCtrl.readUInt());
-				char unit[unitSize + 1];
-				carla_zeroChars(unit, unitSize + 1);
-				nonRtServerCtrl.readCustomData(unit, unitSize);
-
-				CARLA_SAFE_ASSERT_UINT2_BREAK(
-					index < paramCount, index, paramCount);
-
-				if (paramDetails[index].hints &
-				    PARAMETER_IS_ENABLED) {
-					paramDetails[index].name = name;
-					paramDetails[index].symbol = symbol;
-					paramDetails[index].unit = unit;
-				}
-			} break;
-
-			case kPluginBridgeNonRtServerParameterRanges: {
-				// uint/index, float/def, float/min, float/max, float/step, float/stepSmall, float/stepLarge
-				const uint32_t index =
-					nonRtServerCtrl.readUInt();
-				const float def = nonRtServerCtrl.readFloat();
-				const float min = nonRtServerCtrl.readFloat();
-				const float max = nonRtServerCtrl.readFloat();
-				const float step = nonRtServerCtrl.readFloat();
-				nonRtServerCtrl.readFloat();
-				nonRtServerCtrl.readFloat();
-
-				CARLA_SAFE_ASSERT_BREAK(min < max);
-				CARLA_SAFE_ASSERT_BREAK(def >= min);
-				CARLA_SAFE_ASSERT_BREAK(def <= max);
-				CARLA_SAFE_ASSERT_UINT2_BREAK(
-					index < paramCount, index, paramCount);
-
-				if (paramDetails[index].hints &
-				    PARAMETER_IS_ENABLED) {
-					paramDetails[index].def =
-						paramDetails[index].value = def;
-					paramDetails[index].min = min;
-					paramDetails[index].max = max;
-					paramDetails[index].step = step;
-				}
-			} break;
-
-			case kPluginBridgeNonRtServerParameterValue: {
-				// uint/index, float/value
-				const uint32_t index =
-					nonRtServerCtrl.readUInt();
-				const float value = nonRtServerCtrl.readFloat();
-
-				if (index < paramCount) {
-					const float fixedValue =
-						carla_fixedValue(
-							paramDetails[index].min,
-							paramDetails[index].max,
-							value);
-
-					if (carla_isNotEqual(
-						    paramDetails[index].value,
-						    fixedValue)) {
-						paramDetails[index].value =
-							fixedValue;
-
-						if (callback != nullptr) {
-							// skip parameters that we do not show
-							if ((paramDetails[index]
-								     .hints &
-							     PARAMETER_IS_ENABLED) ==
-							    0)
-								break;
-
-							callback->bridge_parameter_changed(
-								index,
-								fixedValue);
-						}
-					}
-				}
-			} break;
-
-			case kPluginBridgeNonRtServerParameterValue2: {
-				// uint/index, float/value
-				const uint32_t index =
-					nonRtServerCtrl.readUInt();
-				const float value = nonRtServerCtrl.readFloat();
-
-				if (index < paramCount) {
-					const float fixedValue =
-						carla_fixedValue(
-							paramDetails[index].min,
-							paramDetails[index].max,
-							value);
-					paramDetails[index].value = fixedValue;
-				}
-			} break;
-
-			case kPluginBridgeNonRtServerParameterTouch: {
-				// uint/index, bool/touch
-				nonRtServerCtrl.readUInt();
-				nonRtServerCtrl.readBool();
-			} break;
-
-			case kPluginBridgeNonRtServerDefaultValue: {
-				// uint/index, float/value
-				const uint32_t index =
-					nonRtServerCtrl.readUInt();
-				const float value = nonRtServerCtrl.readFloat();
-
-				if (index < paramCount)
-					paramDetails[index].def = value;
-			} break;
-
-			case kPluginBridgeNonRtServerCurrentProgram: {
-				// int/index
-				nonRtServerCtrl.readInt();
-			} break;
-
-			case kPluginBridgeNonRtServerCurrentMidiProgram: {
-				// int/index
-				nonRtServerCtrl.readInt();
-			} break;
-
-			case kPluginBridgeNonRtServerProgramName: {
-				// uint/index, uint/size, str[] (name)
-				nonRtServerCtrl.readUInt();
-
-				// name
-				const uint32_t nameSize(
-					nonRtServerCtrl.readUInt());
-				char name[nameSize + 1];
-				carla_zeroChars(name, nameSize + 1);
-				nonRtServerCtrl.readCustomData(name, nameSize);
-			} break;
-
-			case kPluginBridgeNonRtServerMidiProgramData: {
-				// uint/index, uint/bank, uint/program, uint/size, str[] (name)
-				nonRtServerCtrl.readUInt();
-				nonRtServerCtrl.readUInt();
-				nonRtServerCtrl.readUInt();
-
-				// name
-				const uint32_t nameSize(
-					nonRtServerCtrl.readUInt());
-				char name[nameSize + 1];
-				carla_zeroChars(name, nameSize + 1);
-				nonRtServerCtrl.readCustomData(name, nameSize);
-			} break;
-
-			case kPluginBridgeNonRtServerSetCustomData: {
-				// uint/size, str[], uint/size, str[], uint/size, str[]
-
-				// type
-				const uint32_t typeSize =
-					nonRtServerCtrl.readUInt();
-				char type[typeSize + 1];
-				carla_zeroChars(type, typeSize + 1);
-				nonRtServerCtrl.readCustomData(type, typeSize);
-
-				// key
-				const uint32_t keySize =
-					nonRtServerCtrl.readUInt();
-				char key[keySize + 1];
-				carla_zeroChars(key, keySize + 1);
-				nonRtServerCtrl.readCustomData(key, keySize);
-
-				// value
-				const uint32_t valueSize =
-					nonRtServerCtrl.readUInt();
-
-				// special case for big values
-				//                 if (valueSize > 16384)
-				//                 {
-				//                     const uint32_t bigValueFilePathSize = nonRtServerCtrl.readUInt();
-				//                     char bigValueFilePath[bigValueFilePathSize+1];
-				//                     carla_zeroChars(bigValueFilePath, bigValueFilePathSize+1);
-				//                     nonRtServerCtrl.readCustomData(bigValueFilePath, bigValueFilePathSize);
-				//
-				//                     String realBigValueFilePath(bigValueFilePath);
-				//
-				// #ifndef CARLA_OS_WIN
-				//                     // Using Wine, fix temp dir
-				//                     if (fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
-				//                     {
-				//                         const StringArray driveLetterSplit(StringArray::fromTokens(realBigValueFilePath, ":/", ""));
-				//                         carla_stdout("big value save path BEFORE => %s", realBigValueFilePath.toRawUTF8());
-				//
-				//                         realBigValueFilePath  = fWinePrefix;
-				//                         realBigValueFilePath += "/drive_";
-				//                         realBigValueFilePath += driveLetterSplit[0].toLowerCase();
-				//                         realBigValueFilePath += driveLetterSplit[1];
-				//
-				//                         realBigValueFilePath  = realBigValueFilePath.replace("\\", "/");
-				//                         carla_stdout("big value save path AFTER => %s", realBigValueFilePath.toRawUTF8());
-				//                     }
-				// #endif
-				//
-				//                     const File bigValueFile(realBigValueFilePath);
-				//                     CARLA_SAFE_ASSERT_BREAK(bigValueFile.existsAsFile());
-				//
-				//                     CarlaPlugin::setCustomData(type, key, bigValueFile.loadFileAsString().toRawUTF8(), false);
-				//
-				//                     bigValueFile.deleteFile();
-				//                 }
-				//                 else
-				//                 {
-				char value[valueSize + 1];
-				carla_zeroChars(value, valueSize + 1);
-
-				if (valueSize > 0)
-					nonRtServerCtrl.readCustomData(
-						value, valueSize);
-
-				//                     CarlaPlugin::setCustomData(type, key, value, false);
-				//                 }
-
-			} break;
-
-			case kPluginBridgeNonRtServerSetChunkDataFile: {
-				// uint/size, str[] (filename)
-
-				// chunkFilePath
-				const uint32_t chunkFilePathSize =
-					nonRtServerCtrl.readUInt();
-				char chunkFilePath[chunkFilePathSize + 1];
-				carla_zeroChars(chunkFilePath,
-						chunkFilePathSize + 1);
-				nonRtServerCtrl.readCustomData(
-					chunkFilePath, chunkFilePathSize);
-
-				//                 String realChunkFilePath(chunkFilePath);
-				//
-				// #ifndef CARLA_OS_WIN
-				//                 // Using Wine, fix temp dir
-				//                 if (fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
-				//                 {
-				//                     const StringArray driveLetterSplit(StringArray::fromTokens(realChunkFilePath, ":/", ""));
-				//                     carla_stdout("chunk save path BEFORE => %s", realChunkFilePath.toRawUTF8());
-				//
-				//                     realChunkFilePath  = fWinePrefix;
-				//                     realChunkFilePath += "/drive_";
-				//                     realChunkFilePath += driveLetterSplit[0].toLowerCase();
-				//                     realChunkFilePath += driveLetterSplit[1];
-				//
-				//                     realChunkFilePath  = realChunkFilePath.replace("\\", "/");
-				//                     carla_stdout("chunk save path AFTER => %s", realChunkFilePath.toRawUTF8());
-				//                 }
-				// #endif
-
-				//                 const File chunkFile(realChunkFilePath);
-				//                 CARLA_SAFE_ASSERT_BREAK(chunkFile.existsAsFile());
-				//
-				//                 fInfo.chunk = carla_getChunkFromBase64String(chunkFile.loadFileAsString().toRawUTF8());
-				//                 chunkFile.deleteFile();
-			} break;
-
-			case kPluginBridgeNonRtServerSetLatency:
-				// uint
-				//                 fLatency =
-				nonRtServerCtrl.readUInt();
-				// #ifndef BUILD_BRIDGE
-				//                 if (! fInitiated)
-				//                     pData->latency.recreateBuffers(std::max(fInfo.aIns, fInfo.aOuts), fLatency);
-				// #endif
-				break;
-
-			case kPluginBridgeNonRtServerSetParameterText: {
-				const int32_t index = nonRtServerCtrl.readInt();
-
-				const uint32_t textSize(
-					nonRtServerCtrl.readUInt());
-				char text[textSize + 1];
-				carla_zeroChars(text, textSize + 1);
-				nonRtServerCtrl.readCustomData(text, textSize);
-
-				//                 fReceivingParamText.setReceivedData(index, text, textSize);
-			} break;
-
-			case kPluginBridgeNonRtServerReady:
-				ready = true;
-				break;
-
-			case kPluginBridgeNonRtServerSaved:
-				//                 fSaved = true;
-				break;
-
-			case kPluginBridgeNonRtServerRespEmbedUI:
-				//                 fPendingEmbedCustomUI =
-				nonRtServerCtrl.readULong();
-				break;
-
-			case kPluginBridgeNonRtServerResizeEmbedUI: {
-				nonRtServerCtrl.readUInt();
-				nonRtServerCtrl.readUInt();
-			} break;
-
-			case kPluginBridgeNonRtServerUiClosed:
-				// #ifndef BUILD_BRIDGE_ALTERNATIVE_ARCH
-				//                 pData->transientTryCounter = 0;
-				// #endif
-				//                 pData->engine->callback(true, true, ENGINE_CALLBACK_UI_STATE_CHANGED, pData->id,
-				//                                         0, 0, 0, 0.0f, nullptr);
-				break;
-
-			case kPluginBridgeNonRtServerError: {
-				// error
-				const uint32_t errorSize(
-					nonRtServerCtrl.readUInt());
-				char error[errorSize + 1];
-				carla_zeroChars(error, errorSize + 1);
-				nonRtServerCtrl.readCustomData(error,
-							       errorSize);
-
-				//                 if (fInitiated)
-				//                 {
-				//                     pData->engine->callback(true, true, ENGINE_CALLBACK_ERROR, pData->id, 0, 0, 0, 0.0f, error);
-				//
-				//                     // just in case
-				//                     pData->engine->setLastError(error);
-				//                     fInitError = true;
-				//                 }
-				//                 else
-				//                 {
-				//                     pData->engine->setLastError(error);
-				//                     fInitError = true;
-				//                     fInitiated = true;
-				//                 }
-			} break;
-			}
-		}
+		readMessages();
 	}
-	CARLA_SAFE_EXCEPTION("handleNonRtData");
+	CARLA_SAFE_EXCEPTION("readMessages");
 
 	return true;
 }
@@ -953,5 +406,558 @@ void carla_bridge::process(float *buffers[2], uint32_t frames)
 					 audiopool.data + ((c + fInfo.aIns) *
 							   bufferSize),
 					 frames);
+	}
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+void carla_bridge::readMessages()
+{
+	while (nonRtServerCtrl.isDataAvailableForReading()) {
+		const PluginBridgeNonRtServerOpcode opcode =
+			nonRtServerCtrl.readOpcode();
+
+		// #ifdef DEBUG
+		if (opcode != kPluginBridgeNonRtServerPong &&
+			opcode != kPluginBridgeNonRtServerParameterValue2) {
+			carla_stdout(
+				"CarlaPluginBridge::handleNonRtData() - got opcode: %s",
+				PluginBridgeNonRtServerOpcode2str(
+					opcode));
+		}
+		// #endif
+
+		switch (opcode) {
+		case kPluginBridgeNonRtServerNull:
+		case kPluginBridgeNonRtServerPong:
+			break;
+
+		// uint/version
+		case kPluginBridgeNonRtServerVersion:
+			nonRtServerCtrl.readUInt();
+			break;
+
+		// uint/category, uint/hints, uint/optionsAvailable, uint/optionsEnabled, long/uniqueId
+		case kPluginBridgeNonRtServerPluginInfo1: {
+			const uint32_t category =
+				nonRtServerCtrl.readUInt();
+			const uint32_t hints =
+				nonRtServerCtrl.readUInt();
+			const uint32_t optionAv =
+				nonRtServerCtrl.readUInt();
+			const uint32_t optionEn =
+				nonRtServerCtrl.readUInt();
+			const int64_t uniqueId =
+				nonRtServerCtrl.readLong();
+
+			//                 if (fUniqueId != 0) {
+			//                     CARLA_SAFE_ASSERT_INT2(fUniqueId == uniqueId, fUniqueId, uniqueId);
+			//                 }
+
+			//                 pData->hints   = hints | PLUGIN_IS_BRIDGE;
+			//                 pData->options = optionEn;
+
+			//                #ifdef HAVE_X11
+			//                 if (fBridgeVersion < 9 || fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
+			//                #endif
+			//                 {
+			//                     pData->hints &= ~PLUGIN_HAS_CUSTOM_EMBED_UI;
+			//                 }
+
+			//                 fInfo.category = static_cast<PluginCategory>(category);
+			//                 fInfo.optionsAvailable = optionAv;
+		} break;
+
+		// uint/size, str[] (realName), uint/size, str[] (label), uint/size, str[] (maker), uint/size, str[] (copyright)
+		case kPluginBridgeNonRtServerPluginInfo2: {
+			// realName
+			const uint32_t realNameSize(
+				nonRtServerCtrl.readUInt());
+			char realName[realNameSize + 1];
+			carla_zeroChars(realName, realNameSize + 1);
+			nonRtServerCtrl.readCustomData(realName,
+							realNameSize);
+
+			// label
+			const uint32_t labelSize(
+				nonRtServerCtrl.readUInt());
+			char label[labelSize + 1];
+			carla_zeroChars(label, labelSize + 1);
+			nonRtServerCtrl.readCustomData(label,
+							labelSize);
+
+			// maker
+			const uint32_t makerSize(
+				nonRtServerCtrl.readUInt());
+			char maker[makerSize + 1];
+			carla_zeroChars(maker, makerSize + 1);
+			nonRtServerCtrl.readCustomData(maker,
+							makerSize);
+
+			// copyright
+			const uint32_t copyrightSize(
+				nonRtServerCtrl.readUInt());
+			char copyright[copyrightSize + 1];
+			carla_zeroChars(copyright, copyrightSize + 1);
+			nonRtServerCtrl.readCustomData(copyright,
+							copyrightSize);
+
+			fInfo.name = realName;
+			fInfo.label = label;
+			fInfo.maker = maker;
+			fInfo.copyright = copyright;
+		} break;
+
+		// uint/ins, uint/outs
+		case kPluginBridgeNonRtServerAudioCount: {
+			fInfo.clear();
+
+			fInfo.aIns = nonRtServerCtrl.readUInt();
+			fInfo.aOuts = nonRtServerCtrl.readUInt();
+
+			if (fInfo.aIns > 0) {
+				fInfo.aInNames =
+					new const char *[fInfo.aIns];
+				carla_zeroPointers(fInfo.aInNames,
+							fInfo.aIns);
+			}
+
+			if (fInfo.aOuts > 0) {
+				fInfo.aOutNames =
+					new const char *[fInfo.aOuts];
+				carla_zeroPointers(fInfo.aOutNames,
+							fInfo.aOuts);
+			}
+
+		} break;
+
+		// uint/ins, uint/outs
+		case kPluginBridgeNonRtServerMidiCount:
+			nonRtServerCtrl.readUInt();
+			nonRtServerCtrl.readUInt();
+			break;
+
+		// uint/ins, uint/outs
+		case kPluginBridgeNonRtServerCvCount:
+			nonRtServerCtrl.readUInt();
+			nonRtServerCtrl.readUInt();
+			break;
+
+		// uint/count
+		case kPluginBridgeNonRtServerParameterCount: {
+			paramCount = nonRtServerCtrl.readUInt();
+
+			delete[] paramDetails;
+
+			if (paramCount != 0)
+				paramDetails =
+					new carla_param_data[paramCount];
+			else
+				paramDetails = nullptr;
+
+		} break;
+
+		// uint/count
+		case kPluginBridgeNonRtServerProgramCount:
+			nonRtServerCtrl.readUInt();
+			break;
+
+		// uint/count
+		case kPluginBridgeNonRtServerMidiProgramCount:
+			nonRtServerCtrl.readUInt();
+			break;
+
+		// byte/type, uint/index, uint/size, str[] (name)
+		case kPluginBridgeNonRtServerPortName: {
+			nonRtServerCtrl.readByte();
+			nonRtServerCtrl.readUInt();
+
+			// name
+			const uint32_t nameSize(
+				nonRtServerCtrl.readUInt());
+			char *const name = new char[nameSize + 1];
+			carla_zeroChars(name, nameSize + 1);
+			nonRtServerCtrl.readCustomData(name, nameSize);
+
+		} break;
+
+		// uint/index, int/rindex, uint/type, uint/hints, int/cc
+		case kPluginBridgeNonRtServerParameterData1: {
+			const uint32_t index =
+				nonRtServerCtrl.readUInt();
+			const int32_t rindex =
+				nonRtServerCtrl.readInt();
+			const uint32_t type =
+				nonRtServerCtrl.readUInt();
+			const uint32_t hints =
+				nonRtServerCtrl.readUInt();
+			const int16_t ctrl =
+				nonRtServerCtrl.readShort();
+
+			CARLA_SAFE_ASSERT_INT_BREAK(
+				ctrl >= CONTROL_INDEX_NONE &&
+					ctrl <= CONTROL_INDEX_MAX_ALLOWED,
+				ctrl);
+			CARLA_SAFE_ASSERT_UINT2_BREAK(
+				index < paramCount, index, paramCount);
+
+			if (type != PARAMETER_INPUT)
+				break;
+			if ((hints & PARAMETER_IS_ENABLED) == 0)
+				break;
+			if (hints & (PARAMETER_IS_READ_ONLY |
+					PARAMETER_IS_NOT_SAVED))
+				break;
+
+			paramDetails[index].hints = hints;
+		} break;
+
+		// uint/index, uint/size, str[] (name), uint/size, str[] (unit)
+		case kPluginBridgeNonRtServerParameterData2: {
+			const uint32_t index =
+				nonRtServerCtrl.readUInt();
+
+			// name
+			const uint32_t nameSize(
+				nonRtServerCtrl.readUInt());
+			char name[nameSize + 1];
+			carla_zeroChars(name, nameSize + 1);
+			nonRtServerCtrl.readCustomData(name, nameSize);
+
+			// symbol
+			const uint32_t symbolSize(
+				nonRtServerCtrl.readUInt());
+			char symbol[symbolSize + 1];
+			carla_zeroChars(symbol, symbolSize + 1);
+			nonRtServerCtrl.readCustomData(symbol,
+							symbolSize);
+
+			// unit
+			const uint32_t unitSize(
+				nonRtServerCtrl.readUInt());
+			char unit[unitSize + 1];
+			carla_zeroChars(unit, unitSize + 1);
+			nonRtServerCtrl.readCustomData(unit, unitSize);
+
+			CARLA_SAFE_ASSERT_UINT2_BREAK(
+				index < paramCount, index, paramCount);
+
+			if (paramDetails[index].hints &
+				PARAMETER_IS_ENABLED) {
+				paramDetails[index].name = name;
+				paramDetails[index].symbol = symbol;
+				paramDetails[index].unit = unit;
+			}
+		} break;
+
+		// uint/index, float/def, float/min, float/max, float/step, float/stepSmall, float/stepLarge
+		case kPluginBridgeNonRtServerParameterRanges: {
+			const uint32_t index =
+				nonRtServerCtrl.readUInt();
+			const float def = nonRtServerCtrl.readFloat();
+			const float min = nonRtServerCtrl.readFloat();
+			const float max = nonRtServerCtrl.readFloat();
+			const float step = nonRtServerCtrl.readFloat();
+			nonRtServerCtrl.readFloat();
+			nonRtServerCtrl.readFloat();
+
+			CARLA_SAFE_ASSERT_BREAK(min < max);
+			CARLA_SAFE_ASSERT_BREAK(def >= min);
+			CARLA_SAFE_ASSERT_BREAK(def <= max);
+			CARLA_SAFE_ASSERT_UINT2_BREAK(
+				index < paramCount, index, paramCount);
+
+			if (paramDetails[index].hints &
+				PARAMETER_IS_ENABLED) {
+				paramDetails[index].def =
+					paramDetails[index].value = def;
+				paramDetails[index].min = min;
+				paramDetails[index].max = max;
+				paramDetails[index].step = step;
+			}
+		} break;
+
+		// uint/index, float/value
+		case kPluginBridgeNonRtServerParameterValue: {
+			const uint32_t index =
+				nonRtServerCtrl.readUInt();
+			const float value = nonRtServerCtrl.readFloat();
+
+			if (index < paramCount) {
+				const float fixedValue =
+					carla_fixedValue(
+						paramDetails[index].min,
+						paramDetails[index].max,
+						value);
+
+				if (carla_isNotEqual(
+						paramDetails[index].value,
+						fixedValue)) {
+					paramDetails[index].value =
+						fixedValue;
+
+					if (callback != nullptr) {
+						// skip parameters that we do not show
+						if ((paramDetails[index]
+								.hints &
+							PARAMETER_IS_ENABLED) ==
+							0)
+							break;
+
+						callback->bridge_parameter_changed(
+							index,
+							fixedValue);
+					}
+				}
+			}
+		} break;
+
+		// uint/index, float/value
+		case kPluginBridgeNonRtServerParameterValue2: {
+			const uint32_t index =
+				nonRtServerCtrl.readUInt();
+			const float value = nonRtServerCtrl.readFloat();
+
+			if (index < paramCount) {
+				const float fixedValue =
+					carla_fixedValue(
+						paramDetails[index].min,
+						paramDetails[index].max,
+						value);
+				paramDetails[index].value = fixedValue;
+			}
+		} break;
+
+		// uint/index, bool/touch
+		case kPluginBridgeNonRtServerParameterTouch:
+			nonRtServerCtrl.readUInt();
+			nonRtServerCtrl.readBool();
+			break;
+
+		// uint/index, float/value
+		case kPluginBridgeNonRtServerDefaultValue: {
+			const uint32_t index =
+				nonRtServerCtrl.readUInt();
+			const float value = nonRtServerCtrl.readFloat();
+
+			if (index < paramCount)
+				paramDetails[index].def = value;
+		} break;
+
+		// int/index
+		case kPluginBridgeNonRtServerCurrentProgram:
+			nonRtServerCtrl.readInt();
+			break;
+
+		// int/index
+		case kPluginBridgeNonRtServerCurrentMidiProgram:
+			nonRtServerCtrl.readInt();
+			break;
+
+		// uint/index, uint/size, str[] (name)
+		case kPluginBridgeNonRtServerProgramName: {
+			nonRtServerCtrl.readUInt();
+
+			// name
+			const uint32_t nameSize(
+				nonRtServerCtrl.readUInt());
+			char name[nameSize + 1];
+			carla_zeroChars(name, nameSize + 1);
+			nonRtServerCtrl.readCustomData(name, nameSize);
+		} break;
+
+		// uint/index, uint/bank, uint/program, uint/size, str[] (name)
+		case kPluginBridgeNonRtServerMidiProgramData: {
+			nonRtServerCtrl.readUInt();
+			nonRtServerCtrl.readUInt();
+			nonRtServerCtrl.readUInt();
+
+			// name
+			const uint32_t nameSize(
+				nonRtServerCtrl.readUInt());
+			char name[nameSize + 1];
+			carla_zeroChars(name, nameSize + 1);
+			nonRtServerCtrl.readCustomData(name, nameSize);
+		} break;
+
+		// uint/size, str[], uint/size, str[], uint/size, str[]
+		case kPluginBridgeNonRtServerSetCustomData: {
+			// type
+			const uint32_t typeSize =
+				nonRtServerCtrl.readUInt();
+			char type[typeSize + 1];
+			carla_zeroChars(type, typeSize + 1);
+			nonRtServerCtrl.readCustomData(type, typeSize);
+
+			// key
+			const uint32_t keySize =
+				nonRtServerCtrl.readUInt();
+			char key[keySize + 1];
+			carla_zeroChars(key, keySize + 1);
+			nonRtServerCtrl.readCustomData(key, keySize);
+
+			// value
+			const uint32_t valueSize =
+				nonRtServerCtrl.readUInt();
+
+			// special case for big values
+			//                 if (valueSize > 16384)
+			//                 {
+			//                     const uint32_t bigValueFilePathSize = nonRtServerCtrl.readUInt();
+			//                     char bigValueFilePath[bigValueFilePathSize+1];
+			//                     carla_zeroChars(bigValueFilePath, bigValueFilePathSize+1);
+			//                     nonRtServerCtrl.readCustomData(bigValueFilePath, bigValueFilePathSize);
+			//
+			//                     String realBigValueFilePath(bigValueFilePath);
+			//
+			// #ifndef CARLA_OS_WIN
+			//                     // Using Wine, fix temp dir
+			//                     if (fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
+			//                     {
+			//                         const StringArray driveLetterSplit(StringArray::fromTokens(realBigValueFilePath, ":/", ""));
+			//                         carla_stdout("big value save path BEFORE => %s", realBigValueFilePath.toRawUTF8());
+			//
+			//                         realBigValueFilePath  = fWinePrefix;
+			//                         realBigValueFilePath += "/drive_";
+			//                         realBigValueFilePath += driveLetterSplit[0].toLowerCase();
+			//                         realBigValueFilePath += driveLetterSplit[1];
+			//
+			//                         realBigValueFilePath  = realBigValueFilePath.replace("\\", "/");
+			//                         carla_stdout("big value save path AFTER => %s", realBigValueFilePath.toRawUTF8());
+			//                     }
+			// #endif
+			//
+			//                     const File bigValueFile(realBigValueFilePath);
+			//                     CARLA_SAFE_ASSERT_BREAK(bigValueFile.existsAsFile());
+			//
+			//                     CarlaPlugin::setCustomData(type, key, bigValueFile.loadFileAsString().toRawUTF8(), false);
+			//
+			//                     bigValueFile.deleteFile();
+			//                 }
+			//                 else
+			//                 {
+			char value[valueSize + 1];
+			carla_zeroChars(value, valueSize + 1);
+
+			if (valueSize > 0)
+				nonRtServerCtrl.readCustomData(
+					value, valueSize);
+
+			//                     CarlaPlugin::setCustomData(type, key, value, false);
+			//                 }
+
+		} break;
+
+		// uint/size, str[] (filename, base64 content)
+		case kPluginBridgeNonRtServerSetChunkDataFile: {
+			// chunkFilePath
+			const uint32_t chunkFilePathSize =
+				nonRtServerCtrl.readUInt();
+			char chunkFilePath[chunkFilePathSize + 1];
+			carla_zeroChars(chunkFilePath,
+					chunkFilePathSize + 1);
+			nonRtServerCtrl.readCustomData(
+				chunkFilePath, chunkFilePathSize);
+
+			//                 String realChunkFilePath(chunkFilePath);
+			//
+			// #ifndef CARLA_OS_WIN
+			//                 // Using Wine, fix temp dir
+			//                 if (fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
+			//                 {
+			//                     const StringArray driveLetterSplit(StringArray::fromTokens(realChunkFilePath, ":/", ""));
+			//                     carla_stdout("chunk save path BEFORE => %s", realChunkFilePath.toRawUTF8());
+			//
+			//                     realChunkFilePath  = fWinePrefix;
+			//                     realChunkFilePath += "/drive_";
+			//                     realChunkFilePath += driveLetterSplit[0].toLowerCase();
+			//                     realChunkFilePath += driveLetterSplit[1];
+			//
+			//                     realChunkFilePath  = realChunkFilePath.replace("\\", "/");
+			//                     carla_stdout("chunk save path AFTER => %s", realChunkFilePath.toRawUTF8());
+			//                 }
+			// #endif
+
+			//                 const File chunkFile(realChunkFilePath);
+			//                 CARLA_SAFE_ASSERT_BREAK(chunkFile.existsAsFile());
+			//
+			//                 fInfo.chunk = carla_getChunkFromBase64String(chunkFile.loadFileAsString().toRawUTF8());
+			//                 chunkFile.deleteFile();
+		} break;
+
+		// uint/latency
+		case kPluginBridgeNonRtServerSetLatency:
+			//                 fLatency =
+			nonRtServerCtrl.readUInt();
+			// #ifndef BUILD_BRIDGE
+			//                 if (! fInitiated)
+			//                     pData->latency.recreateBuffers(std::max(fInfo.aIns, fInfo.aOuts), fLatency);
+			// #endif
+			break;
+
+		case kPluginBridgeNonRtServerSetParameterText: {
+			const int32_t index = nonRtServerCtrl.readInt();
+
+			const uint32_t textSize(
+				nonRtServerCtrl.readUInt());
+			char text[textSize + 1];
+			carla_zeroChars(text, textSize + 1);
+			nonRtServerCtrl.readCustomData(text, textSize);
+
+			//                 fReceivingParamText.setReceivedData(index, text, textSize);
+		} break;
+
+		case kPluginBridgeNonRtServerReady:
+			ready = true;
+			break;
+
+		case kPluginBridgeNonRtServerSaved:
+			saved = true;
+			break;
+
+		// ulong/window-id
+		case kPluginBridgeNonRtServerRespEmbedUI:
+			nonRtServerCtrl.readULong();
+			break;
+
+		// uint/width, uint/height
+		case kPluginBridgeNonRtServerResizeEmbedUI:
+			nonRtServerCtrl.readUInt();
+			nonRtServerCtrl.readUInt();
+			break;
+
+		case kPluginBridgeNonRtServerUiClosed:
+			// #ifndef BUILD_BRIDGE_ALTERNATIVE_ARCH
+			//                 pData->transientTryCounter = 0;
+			// #endif
+			//                 pData->engine->callback(true, true, ENGINE_CALLBACK_UI_STATE_CHANGED, pData->id,
+			//                                         0, 0, 0, 0.0f, nullptr);
+			break;
+
+		// uint/size, str[]
+		case kPluginBridgeNonRtServerError: {
+			const uint32_t errorSize(
+				nonRtServerCtrl.readUInt());
+			char error[errorSize + 1];
+			carla_zeroChars(error, errorSize + 1);
+			nonRtServerCtrl.readCustomData(error,
+							errorSize);
+
+			//                 if (fInitiated)
+			//                 {
+			//                     pData->engine->callback(true, true, ENGINE_CALLBACK_ERROR, pData->id, 0, 0, 0, 0.0f, error);
+			//
+			//                     // just in case
+			//                     pData->engine->setLastError(error);
+			//                     fInitError = true;
+			//                 }
+			//                 else
+			//                 {
+			//                     pData->engine->setLastError(error);
+			//                     fInitError = true;
+			//                     fInitiated = true;
+			//                 }
+		} break;
+		}
 	}
 }

@@ -9,8 +9,6 @@
 
 // for audio generator thread
 #include <threads.h>
-#include <unistd.h>
-#include <time.h>
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -59,10 +57,9 @@ static int carla_obs_audio_gen_thread(void *data)
 
 	while (carla->audiogen_running) {
 		const uint32_t buffer_size =
-			carla->buffer_size_mode == buffer_size_static_128 ? 128
-			: carla->buffer_size_mode == buffer_size_static_256
-				? 256
-				: MAX_AUDIO_BUFFER_SIZE;
+			carla->buffer_size_mode == buffer_size_static_128 ? 128 :
+			carla->buffer_size_mode == buffer_size_static_256 ? 256 :
+			MAX_AUDIO_BUFFER_SIZE;
 
 		out.frames = buffer_size;
 		carla_priv_process_audio(carla->priv, carla->buffers,
@@ -247,10 +244,10 @@ static void carla_obs_filter_audio_static(struct carla_data *carla,
 					  struct obs_audio_data *audio)
 {
 	const uint32_t buffer_size =
-		carla->buffer_size_mode == buffer_size_static_128 ? 128
-		: carla->buffer_size_mode == buffer_size_static_256
-			? 256
-			: MAX_AUDIO_BUFFER_SIZE;
+		carla->buffer_size_mode == buffer_size_static_128 ? 128 :
+		carla->buffer_size_mode == buffer_size_static_256 ? 256 :
+		MAX_AUDIO_BUFFER_SIZE;
+	const size_t channels = carla->channels;
 	const uint32_t frames = audio->frames;
 
 	// cast audio buffers to correct type
@@ -267,10 +264,10 @@ static void carla_obs_filter_audio_static(struct carla_data *carla,
 		// OBS -> plugin internal buffering
 		h = buffer_head++;
 
-		for (uint8_t c = 0; c < carla->channels; ++c)
+		for (uint8_t c = 0; c < channels; ++c)
 			carla->buffers[c][h] = obsbuffers[c][i];
 
-		// we reach the target buffer size, do audio processing
+		// when we reach the target buffer size, do audio processing
 		if (buffer_head == buffer_size) {
 			buffer_head = 0;
 			carla_priv_process_audio(carla->priv, carla->buffers,
@@ -283,13 +280,13 @@ static void carla_obs_filter_audio_static(struct carla_data *carla,
 
 		if (buffer_tail == UINT16_MAX) {
 			// buffering still taking place, skip until first audio cycle
-			for (uint8_t c = 0; c < carla->channels; ++c)
+			for (uint8_t c = 0; c < channels; ++c)
 				obsbuffers[c][i] = 0.f;
 		} else {
 			// plugin -> OBS buffer copy
 			t = buffer_tail++;
 
-			for (uint8_t c = 0; c < carla->channels; ++c)
+			for (uint8_t c = 0; c < channels; ++c)
 				obsbuffers[c][i] = carla->buffers[c][t];
 
 			if (buffer_tail == buffer_size)
