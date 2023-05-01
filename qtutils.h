@@ -6,12 +6,12 @@
 
 #pragma once
 
-#include <stdint.h>
-
 #ifdef __cplusplus
+#include <cstdint>
 #include <QtWidgets/QMainWindow>
 extern "C" {
 #else
+#include <stdint.h>
 typedef struct QMainWindow QMainWindow;
 #endif
 

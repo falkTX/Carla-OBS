@@ -5,18 +5,21 @@
  */
 
 #include "carla-bridge.hpp"
+#include "common.h"
 
 #include <obs-module.h>
 #include <util/platform.h>
 
 #include "CarlaBackendUtils.hpp"
+#include "CarlaBase64Utils.hpp"
 
 #include "water/files/File.h"
 #include "water/misc/Time.h"
+#include "water/streams/MemoryOutputStream.h"
 
 #include <ctime>
 
-// --------------------------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 static void stopProcess(water::ChildProcess *const process)
 {
@@ -46,7 +49,7 @@ static void stopProcess(water::ChildProcess *const process)
 	}
 }
 
-// --------------------------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 bool carla_bridge::init(uint32_t maxBufferSize, double sampleRate)
 {
@@ -163,6 +166,7 @@ void carla_bridge::cleanup()
 	nonRtClientCtrl.clear();
 	rtClientCtrl.clear();
 	audiopool.clear();
+	info.clear();
 }
 
 bool carla_bridge::start(const PluginType type,
@@ -235,6 +239,9 @@ bool carla_bridge::start(const PluginType type,
 		return false;
 	}
 
+	ready = false;
+	timedOut = false;
+
 	while (isRunning() && idle() && !ready)
 		carla_msleep(5);
 
@@ -242,6 +249,10 @@ bool carla_bridge::start(const PluginType type,
 		nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientActivate);
 		nonRtClientCtrl.commitWrite();
 	}
+
+	info.ptype = type;
+	info.filename = filename;
+	info.label = label;
 
 	return ready;
 }
@@ -267,7 +278,6 @@ bool carla_bridge::idle()
 		nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientPing);
 		nonRtClientCtrl.commitWrite();
 	} else {
-		//         fTimedOut   = true;
 		//         fTimedError = true;
 		printf("bridge closed by itself!\n");
 		activated = false;
@@ -300,7 +310,7 @@ bool carla_bridge::wait(const char *const action, const uint msecs)
 	return false;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 void carla_bridge::set_value(uint index, float value)
 {
@@ -384,6 +394,7 @@ void carla_bridge::deactivate()
 void carla_bridge::process(float *buffers[2], uint32_t frames)
 {
 	CARLA_SAFE_ASSERT_RETURN(activated, );
+	CARLA_SAFE_ASSERT_RETURN(ready, );
 
 	if (!isRunning())
 		return;
@@ -403,13 +414,67 @@ void carla_bridge::process(float *buffers[2], uint32_t frames)
 	if (wait("process", 1000)) {
 		for (uint32_t c = 0; c < 2; ++c)
 			carla_copyFloats(buffers[c],
-					 audiopool.data + ((c + fInfo.aIns) *
+					 audiopool.data + ((c + info.numAudioIns) *
 							   bufferSize),
 					 frames);
 	}
 }
 
-// --------------------------------------------------------------------------------------------------------------------
+void carla_bridge::load_chunk()
+{
+	const CarlaString dataBase64(CarlaString::asBase64(info.chunk.data(),
+							   info.chunk.size()));
+	CARLA_SAFE_ASSERT_RETURN(dataBase64.length() > 0,);
+
+	water::String filePath(water::File::getSpecialLocation(water::File::tempDirectory).getFullPathName());
+
+	filePath += CARLA_OS_SEP_STR ".CarlaChunk_";
+	filePath += audiopool.getFilenameSuffix();
+
+	if (water::File(filePath).replaceWithText(dataBase64.buffer()))
+	{
+		const uint32_t ulength = static_cast<uint32_t>(filePath.length());
+
+		const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
+
+		nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientSetChunkDataFile);
+		nonRtClientCtrl.writeUInt(ulength);
+		nonRtClientCtrl.writeCustomData(filePath.toRawUTF8(), ulength);
+		nonRtClientCtrl.commitWrite();
+	}
+}
+
+void carla_bridge::save_and_wait()
+{
+	saved = false;
+
+	{
+		const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
+
+		// deactivate bridge client-side ping check
+		// some plugins block during load
+		nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientPingOnOff);
+		nonRtClientCtrl.writeBool(false);
+		nonRtClientCtrl.commitWrite();
+
+		nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientPrepareForSave);
+		nonRtClientCtrl.commitWrite();
+	}
+
+	while (isRunning() && idle() && !saved)
+		carla_msleep(5);
+
+	if (isRunning())
+	{
+		const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
+
+		nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientPingOnOff);
+		nonRtClientCtrl.writeBool(true);
+		nonRtClientCtrl.commitWrite();
+	}
+}
+
+// ----------------------------------------------------------------------------
 
 void carla_bridge::readMessages()
 {
@@ -439,33 +504,27 @@ void carla_bridge::readMessages()
 
 		// uint/category, uint/hints, uint/optionsAvailable, uint/optionsEnabled, long/uniqueId
 		case kPluginBridgeNonRtServerPluginInfo1: {
+			info.clear();
+
 			const uint32_t category =
 				nonRtServerCtrl.readUInt();
-			const uint32_t hints =
-				nonRtServerCtrl.readUInt();
+			info.hints = nonRtServerCtrl.readUInt() | PLUGIN_IS_BRIDGE;
 			const uint32_t optionAv =
 				nonRtServerCtrl.readUInt();
-			const uint32_t optionEn =
-				nonRtServerCtrl.readUInt();
+			info.options = nonRtServerCtrl.readUInt();
 			const int64_t uniqueId =
 				nonRtServerCtrl.readLong();
 
-			//                 if (fUniqueId != 0) {
-			//                     CARLA_SAFE_ASSERT_INT2(fUniqueId == uniqueId, fUniqueId, uniqueId);
-			//                 }
+			if (info.uniqueId != 0) {
+				CARLA_SAFE_ASSERT_INT2(info.uniqueId == uniqueId, info.uniqueId, uniqueId);
+			}
 
-			//                 pData->hints   = hints | PLUGIN_IS_BRIDGE;
-			//                 pData->options = optionEn;
-
-			//                #ifdef HAVE_X11
-			//                 if (fBridgeVersion < 9 || fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
-			//                #endif
-			//                 {
-			//                     pData->hints &= ~PLUGIN_HAS_CUSTOM_EMBED_UI;
-			//                 }
-
-			//                 fInfo.category = static_cast<PluginCategory>(category);
-			//                 fInfo.optionsAvailable = optionAv;
+			#ifdef HAVE_X11
+			// if (fBridgeVersion < 9 || fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
+			#endif
+			{
+				info.hints &= ~PLUGIN_HAS_CUSTOM_EMBED_UI;
+			}
 		} break;
 
 		// uint/size, str[] (realName), uint/size, str[] (label), uint/size, str[] (maker), uint/size, str[] (copyright)
@@ -474,7 +533,6 @@ void carla_bridge::readMessages()
 			const uint32_t realNameSize(
 				nonRtServerCtrl.readUInt());
 			char realName[realNameSize + 1];
-			carla_zeroChars(realName, realNameSize + 1);
 			nonRtServerCtrl.readCustomData(realName,
 							realNameSize);
 
@@ -482,7 +540,6 @@ void carla_bridge::readMessages()
 			const uint32_t labelSize(
 				nonRtServerCtrl.readUInt());
 			char label[labelSize + 1];
-			carla_zeroChars(label, labelSize + 1);
 			nonRtServerCtrl.readCustomData(label,
 							labelSize);
 
@@ -490,7 +547,6 @@ void carla_bridge::readMessages()
 			const uint32_t makerSize(
 				nonRtServerCtrl.readUInt());
 			char maker[makerSize + 1];
-			carla_zeroChars(maker, makerSize + 1);
 			nonRtServerCtrl.readCustomData(maker,
 							makerSize);
 
@@ -498,38 +554,15 @@ void carla_bridge::readMessages()
 			const uint32_t copyrightSize(
 				nonRtServerCtrl.readUInt());
 			char copyright[copyrightSize + 1];
-			carla_zeroChars(copyright, copyrightSize + 1);
 			nonRtServerCtrl.readCustomData(copyright,
 							copyrightSize);
-
-			fInfo.name = realName;
-			fInfo.label = label;
-			fInfo.maker = maker;
-			fInfo.copyright = copyright;
 		} break;
 
 		// uint/ins, uint/outs
-		case kPluginBridgeNonRtServerAudioCount: {
-			fInfo.clear();
-
-			fInfo.aIns = nonRtServerCtrl.readUInt();
-			fInfo.aOuts = nonRtServerCtrl.readUInt();
-
-			if (fInfo.aIns > 0) {
-				fInfo.aInNames =
-					new const char *[fInfo.aIns];
-				carla_zeroPointers(fInfo.aInNames,
-							fInfo.aIns);
-			}
-
-			if (fInfo.aOuts > 0) {
-				fInfo.aOutNames =
-					new const char *[fInfo.aOuts];
-				carla_zeroPointers(fInfo.aOutNames,
-							fInfo.aOuts);
-			}
-
-		} break;
+		case kPluginBridgeNonRtServerAudioCount:
+			nonRtServerCtrl.readUInt();
+			nonRtServerCtrl.readUInt();
+			break;
 
 		// uint/ins, uint/outs
 		case kPluginBridgeNonRtServerMidiCount:
@@ -554,7 +587,6 @@ void carla_bridge::readMessages()
 					new carla_param_data[paramCount];
 			else
 				paramDetails = nullptr;
-
 		} break;
 
 		// uint/count
@@ -575,8 +607,7 @@ void carla_bridge::readMessages()
 			// name
 			const uint32_t nameSize(
 				nonRtServerCtrl.readUInt());
-			char *const name = new char[nameSize + 1];
-			carla_zeroChars(name, nameSize + 1);
+			char name[nameSize + 1];
 			nonRtServerCtrl.readCustomData(name, nameSize);
 
 		} break;
@@ -762,7 +793,6 @@ void carla_bridge::readMessages()
 			const uint32_t nameSize(
 				nonRtServerCtrl.readUInt());
 			char name[nameSize + 1];
-			carla_zeroChars(name, nameSize + 1);
 			nonRtServerCtrl.readCustomData(name, nameSize);
 		} break;
 
@@ -776,7 +806,6 @@ void carla_bridge::readMessages()
 			const uint32_t nameSize(
 				nonRtServerCtrl.readUInt());
 			char name[nameSize + 1];
-			carla_zeroChars(name, nameSize + 1);
 			nonRtServerCtrl.readCustomData(name, nameSize);
 		} break;
 
@@ -801,50 +830,50 @@ void carla_bridge::readMessages()
 				nonRtServerCtrl.readUInt();
 
 			// special case for big values
-			//                 if (valueSize > 16384)
-			//                 {
-			//                     const uint32_t bigValueFilePathSize = nonRtServerCtrl.readUInt();
-			//                     char bigValueFilePath[bigValueFilePathSize+1];
-			//                     carla_zeroChars(bigValueFilePath, bigValueFilePathSize+1);
-			//                     nonRtServerCtrl.readCustomData(bigValueFilePath, bigValueFilePathSize);
-			//
-			//                     String realBigValueFilePath(bigValueFilePath);
-			//
-			// #ifndef CARLA_OS_WIN
-			//                     // Using Wine, fix temp dir
-			//                     if (fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
-			//                     {
-			//                         const StringArray driveLetterSplit(StringArray::fromTokens(realBigValueFilePath, ":/", ""));
-			//                         carla_stdout("big value save path BEFORE => %s", realBigValueFilePath.toRawUTF8());
-			//
-			//                         realBigValueFilePath  = fWinePrefix;
-			//                         realBigValueFilePath += "/drive_";
-			//                         realBigValueFilePath += driveLetterSplit[0].toLowerCase();
-			//                         realBigValueFilePath += driveLetterSplit[1];
-			//
-			//                         realBigValueFilePath  = realBigValueFilePath.replace("\\", "/");
-			//                         carla_stdout("big value save path AFTER => %s", realBigValueFilePath.toRawUTF8());
-			//                     }
-			// #endif
-			//
-			//                     const File bigValueFile(realBigValueFilePath);
-			//                     CARLA_SAFE_ASSERT_BREAK(bigValueFile.existsAsFile());
-			//
-			//                     CarlaPlugin::setCustomData(type, key, bigValueFile.loadFileAsString().toRawUTF8(), false);
-			//
-			//                     bigValueFile.deleteFile();
-			//                 }
-			//                 else
-			//                 {
-			char value[valueSize + 1];
-			carla_zeroChars(value, valueSize + 1);
+			if (valueSize > 16384)
+			{
+				const uint32_t bigValueFilePathSize = nonRtServerCtrl.readUInt();
+				char bigValueFilePath[bigValueFilePathSize+1];
+				carla_zeroChars(bigValueFilePath, bigValueFilePathSize+1);
+				nonRtServerCtrl.readCustomData(bigValueFilePath, bigValueFilePathSize);
 
-			if (valueSize > 0)
-				nonRtServerCtrl.readCustomData(
-					value, valueSize);
+// 				String realBigValueFilePath(bigValueFilePath);
 
-			//                     CarlaPlugin::setCustomData(type, key, value, false);
-			//                 }
+// #ifndef CARLA_OS_WIN
+//                     // Using Wine, fix temp dir
+//                     if (fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
+//                     {
+//                         const StringArray driveLetterSplit(StringArray::fromTokens(realBigValueFilePath, ":/", ""));
+//                         carla_stdout("big value save path BEFORE => %s", realBigValueFilePath.toRawUTF8());
+//
+//                         realBigValueFilePath  = fWinePrefix;
+//                         realBigValueFilePath += "/drive_";
+//                         realBigValueFilePath += driveLetterSplit[0].toLowerCase();
+//                         realBigValueFilePath += driveLetterSplit[1];
+//
+//                         realBigValueFilePath  = realBigValueFilePath.replace("\\", "/");
+//                         carla_stdout("big value save path AFTER => %s", realBigValueFilePath.toRawUTF8());
+//                     }
+// #endif
+
+// 				const File bigValueFile(realBigValueFilePath);
+// 				CARLA_SAFE_ASSERT_BREAK(bigValueFile.existsAsFile());
+//
+// 				CarlaPlugin::setCustomData(type, key, bigValueFile.loadFileAsString().toRawUTF8(), false);
+//
+// 				bigValueFile.deleteFile();
+			}
+			else
+			{
+				char value[valueSize + 1];
+				carla_zeroChars(value, valueSize + 1);
+
+				if (valueSize > 0)
+					nonRtServerCtrl.readCustomData(
+						value, valueSize);
+
+// 				CarlaPlugin::setCustomData(type, key, value, false);
+			}
 
 		} break;
 
@@ -859,30 +888,30 @@ void carla_bridge::readMessages()
 			nonRtServerCtrl.readCustomData(
 				chunkFilePath, chunkFilePathSize);
 
-			//                 String realChunkFilePath(chunkFilePath);
-			//
-			// #ifndef CARLA_OS_WIN
-			//                 // Using Wine, fix temp dir
-			//                 if (fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
-			//                 {
-			//                     const StringArray driveLetterSplit(StringArray::fromTokens(realChunkFilePath, ":/", ""));
-			//                     carla_stdout("chunk save path BEFORE => %s", realChunkFilePath.toRawUTF8());
-			//
-			//                     realChunkFilePath  = fWinePrefix;
-			//                     realChunkFilePath += "/drive_";
-			//                     realChunkFilePath += driveLetterSplit[0].toLowerCase();
-			//                     realChunkFilePath += driveLetterSplit[1];
-			//
-			//                     realChunkFilePath  = realChunkFilePath.replace("\\", "/");
-			//                     carla_stdout("chunk save path AFTER => %s", realChunkFilePath.toRawUTF8());
-			//                 }
-			// #endif
+			water::String realChunkFilePath(chunkFilePath);
 
-			//                 const File chunkFile(realChunkFilePath);
-			//                 CARLA_SAFE_ASSERT_BREAK(chunkFile.existsAsFile());
-			//
-			//                 fInfo.chunk = carla_getChunkFromBase64String(chunkFile.loadFileAsString().toRawUTF8());
-			//                 chunkFile.deleteFile();
+// #ifndef CARLA_OS_WIN
+// 			// Using Wine, fix temp dir
+// 			if (fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
+// 			{
+// 				const StringArray driveLetterSplit(StringArray::fromTokens(realChunkFilePath, ":/", ""));
+// 				carla_stdout("chunk save path BEFORE => %s", realChunkFilePath.toRawUTF8());
+//
+// 				realChunkFilePath  = fWinePrefix;
+// 				realChunkFilePath += "/drive_";
+// 				realChunkFilePath += driveLetterSplit[0].toLowerCase();
+// 				realChunkFilePath += driveLetterSplit[1];
+//
+// 				realChunkFilePath  = realChunkFilePath.replace("\\", "/");
+// 				carla_stdout("chunk save path AFTER => %s", realChunkFilePath.toRawUTF8());
+// 			}
+// #endif
+
+			const water::File chunkFile(realChunkFilePath);
+			CARLA_SAFE_ASSERT_BREAK(chunkFile.existsAsFile());
+
+			info.chunk = carla_getChunkFromBase64String(chunkFile.loadFileAsString().toRawUTF8());
+			chunkFile.deleteFile();
 		} break;
 
 		// uint/latency

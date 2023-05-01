@@ -6,15 +6,18 @@
 
 #include "carla-bridge.hpp"
 #include "carla-wrapper.h"
+#include "common.h"
 #include "qtutils.h"
 #include <util/platform.h>
 
+#include "CarlaBackendUtils.hpp"
+#include "CarlaBase64Utils.hpp"
 #include "CarlaFrontend.h"
 
 // generates a warning if this is defined as anything else
 #define CARLA_API
 
-// --------------------------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // private data methods
 
 struct carla_priv : carla_bridge_callback {
@@ -23,7 +26,7 @@ struct carla_priv : carla_bridge_callback {
 	double sampleRate = 0;
 
 	// update properties when timeout is reached, 0 means do nothing
-	uint64_t update_requested = 0;
+	uint64_t update_request = 0;
 
 	carla_bridge bridge;
 
@@ -47,11 +50,11 @@ struct carla_priv : carla_bridge_callback {
 
 		obs_data_release(settings);
 
-		update_requested = os_gettime_ns();
+		postpone_update_request(&update_request);
 	}
 };
 
-// --------------------------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // carla + obs integration methods
 
 struct carla_priv *carla_priv_create(obs_source_t *source,
@@ -84,7 +87,7 @@ void carla_priv_destroy(struct carla_priv *priv)
 	delete priv;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 void carla_priv_activate(struct carla_priv *priv)
 {
@@ -96,8 +99,8 @@ void carla_priv_deactivate(struct carla_priv *priv)
 	priv->bridge.deactivate();
 }
 
-void carla_priv_process_audio(struct carla_priv *priv, float *buffers[2],
-			      uint32_t frames)
+void carla_priv_process_audio(struct carla_priv *priv,
+			      float *buffers[MAX_AV_PLANES], uint32_t frames)
 {
 	priv->bridge.process(buffers, frames);
 }
@@ -109,42 +112,163 @@ void carla_priv_idle(struct carla_priv *priv)
 		// TODO something
 	}
 
-	if (priv->update_requested != 0) {
-		const uint64_t now = os_gettime_ns();
+	handle_update_request(priv->source, &priv->update_request);
+}
 
-		// request in the future?
-		if (now < priv->update_requested) {
-			priv->update_requested = now;
-			return;
-		}
+// ----------------------------------------------------------------------------
 
-		if (now - priv->update_requested >= 100000000ULL) // 100ms
-		{
-			priv->update_requested = 0;
+void carla_priv_save(struct carla_priv *priv, obs_data_t *settings)
+{
+	priv->bridge.save_and_wait();
 
-			signal_handler_t *sighandler =
-				obs_source_get_signal_handler(priv->source);
-			signal_handler_signal(sighandler, "update_properties",
-					      NULL);
+	obs_data_set_string(settings, "type", getPluginTypeAsString(priv->bridge.info.ptype));
+	obs_data_set_string(settings, "filename", priv->bridge.info.filename);
+	obs_data_set_string(settings, "label", priv->bridge.info.label);
+
+	if (priv->bridge.info.hints & PLUGIN_OPTION_USE_CHUNKS) {
+		char *b64ptr = CarlaString::asBase64(priv->bridge.info.chunk.data(),
+						     priv->bridge.info.chunk.size()).releaseBufferPointer();
+		const CarlaString b64chunk(b64ptr, false);
+		obs_data_set_string(settings, "chunk", b64chunk);
+	} else {
+		char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
+
+		for (uint32_t i = 0; i < priv->bridge.paramCount; ++i) {
+			const carla_param_data &param(priv->bridge.paramDetails[i]);
+
+			if ((param.hints & PARAMETER_IS_ENABLED) == 0)
+				continue;
+
+			param_index_to_name(i, pname);
+
+			if (param.hints & PARAMETER_IS_BOOLEAN) {
+				obs_data_set_bool(settings, pname,
+						carla_isEqual(param.value,
+								param.max));
+			} else if (param.hints & PARAMETER_IS_INTEGER) {
+				obs_data_set_int(settings, pname, param.value);
+			} else {
+				obs_data_set_double(settings, pname, param.value);
+			}
 		}
 	}
 }
 
-char *carla_priv_get_state(struct carla_priv *priv)
+void carla_priv_load(struct carla_priv *priv, obs_data_t *settings)
 {
-	return NULL;
+	const char *type = obs_data_get_string(settings, "type");
+	const char *filename = obs_data_get_string(settings, "filename");
+	const char *label = obs_data_get_string(settings, "label");
+	int64_t uniqueId = 0;
+
+	priv->bridge.cleanup();
+	priv->bridge.init(priv->bufferSize, priv->sampleRate);
+
+	// TODO show error message if bridge fails
+	priv->bridge.start(getPluginTypeFromString(type), "x86_64",
+			   "/usr/lib/carla/carla-bridge-native", label,
+			   filename, uniqueId);
+
+	if (priv->bridge.info.hints & PLUGIN_OPTION_USE_CHUNKS) {
+		const char *chunk = obs_data_get_string(settings, "chunk");
+		priv->bridge.info.chunk = carla_getChunkFromBase64String(chunk);
+		priv->bridge.load_chunk();
+	}
+	else {
+		char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
+
+		for (uint32_t i = 0; i < priv->bridge.paramCount; ++i) {
+			const carla_param_data &param(priv->bridge.paramDetails[i]);
+
+			if ((param.hints & PARAMETER_IS_ENABLED) == 0)
+				continue;
+
+			param_index_to_name(i, pname);
+
+			if (param.hints & PARAMETER_IS_BOOLEAN) {
+				obs_data_set_bool(settings, pname,
+						carla_isEqual(param.value,
+								param.max));
+			} else if (param.hints & PARAMETER_IS_INTEGER) {
+				obs_data_set_int(settings, pname, param.value);
+			} else {
+				obs_data_set_double(settings, pname, param.value);
+			}
+
+			priv->bridge.set_value(i, param.value);
+		}
+	}
 }
 
-void carla_priv_set_state(struct carla_priv *priv, const char *state) {}
-
-// --------------------------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 void carla_priv_set_buffer_size(struct carla_priv *priv,
 				enum buffer_size_mode bufsize)
 {
 }
 
-// --------------------------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+
+static bool carla_post_load_callback(struct carla_priv *priv,
+				     obs_properties_t *props)
+{
+	obs_source_t *source = priv->source;
+	obs_data_t *settings = obs_source_get_settings(source);
+	remove_all_props(props, settings);
+	carla_priv_readd_properties(priv, props, true);
+	obs_data_release(settings);
+	return true;
+}
+
+static bool carla_priv_load_file_callback(obs_properties_t *props,
+					  obs_property_t *property, void *data)
+{
+	UNUSED_PARAMETER(property);
+
+	struct carla_priv *priv = static_cast<struct carla_priv *>(data);
+
+	const char *filename = carla_qt_file_dialog(
+		false, false, obs_module_text("Load File"), NULL);
+
+	if (filename == NULL)
+		return false;
+
+	priv->bridge.cleanup();
+	priv->bridge.init(priv->bufferSize, priv->sampleRate);
+
+	// TODO put in the correct types
+	// TODO show error message if bridge fails
+	priv->bridge.start(PLUGIN_VST2, "x86_64",
+			   "/usr/lib/carla/carla-bridge-native", "", filename,
+			   0);
+
+	return carla_post_load_callback(priv, props);
+}
+
+static bool carla_priv_select_plugin_callback(obs_properties_t *props,
+					      obs_property_t *property, void *data)
+{
+	UNUSED_PARAMETER(property);
+
+	struct carla_priv *priv = static_cast<struct carla_priv *>(data);
+
+	const PluginListDialogResults *plugin =
+		carla_frontend_createAndExecPluginListDialog(
+			carla_qt_get_main_window());
+
+	if (plugin == NULL)
+		return false;
+
+	priv->bridge.cleanup();
+	priv->bridge.init(priv->bufferSize, priv->sampleRate);
+
+	// TODO show error message if bridge fails
+	priv->bridge.start((PluginType)plugin->type, "x86_64",
+			   "/usr/lib/carla/carla-bridge-native", plugin->label,
+			   plugin->filename, plugin->uniqueId);
+
+	return carla_post_load_callback(priv, props);
+}
 
 static bool carla_priv_param_changed(void *data, obs_properties_t *props,
 				     obs_property_t *property,
@@ -203,13 +327,25 @@ static bool carla_priv_param_changed(void *data, obs_properties_t *props,
 void carla_priv_readd_properties(struct carla_priv *priv,
 				 obs_properties_t *props, bool reset)
 {
-	obs_data_t *settings = obs_source_get_settings(priv->source);
+	if (!reset) {
+		// first init, add unremovable buttons
+		obs_properties_add_button2(props, PROP_SELECT_PLUGIN,
+					   obs_module_text("Select plugin..."),
+					   carla_priv_select_plugin_callback,
+					   priv);
+
+		obs_properties_add_button2(props, PROP_LOAD_FILE,
+					   obs_module_text("Load file..."),
+					   carla_priv_load_file_callback, priv);
+	}
 
 	if (priv->bridge.isRunning()) {
 		obs_properties_add_button2(props, PROP_SHOW_GUI,
 					   obs_module_text("Show custom GUI"),
 					   carla_priv_show_gui_callback, priv);
 	}
+
+	obs_data_t *settings = obs_source_get_settings(priv->source);
 
 	char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
 
@@ -268,68 +404,7 @@ void carla_priv_readd_properties(struct carla_priv *priv,
 	obs_data_release(settings);
 }
 
-// --------------------------------------------------------------------------------------------------------------------
-
-static bool carla_post_load_callback(struct carla_priv *priv,
-				     obs_properties_t *props)
-{
-	obs_source_t *source = priv->source;
-	obs_data_t *settings = obs_source_get_settings(source);
-	remove_all_props(props, settings);
-	carla_priv_readd_properties(priv, props, true);
-	obs_data_release(settings);
-	return true;
-}
-
-bool carla_priv_load_file_callback(obs_properties_t *props,
-				   obs_property_t *property, void *data)
-{
-	UNUSED_PARAMETER(property);
-
-	struct carla_priv *priv = static_cast<struct carla_priv *>(data);
-
-	const char *filename = carla_qt_file_dialog(
-		false, false, obs_module_text("Load File"), NULL);
-
-	if (filename == NULL)
-		return false;
-
-	priv->bridge.cleanup();
-	priv->bridge.init(priv->bufferSize, priv->sampleRate);
-
-	// TODO put in the correct types
-	// TODO show error message if bridge fails
-	priv->bridge.start(PLUGIN_VST2, "x86_64",
-			   "/usr/lib/carla/carla-bridge-native", "", filename,
-			   0);
-
-	return carla_post_load_callback(priv, props);
-}
-
-bool carla_priv_select_plugin_callback(obs_properties_t *props,
-				       obs_property_t *property, void *data)
-{
-	UNUSED_PARAMETER(property);
-
-	struct carla_priv *priv = static_cast<struct carla_priv *>(data);
-
-	const PluginListDialogResults *plugin =
-		carla_frontend_createAndExecPluginListDialog(
-			carla_qt_get_main_window());
-
-	if (plugin == NULL)
-		return false;
-
-	priv->bridge.cleanup();
-	priv->bridge.init(priv->bufferSize, priv->sampleRate);
-
-	// TODO show error message if bridge fails
-	priv->bridge.start((PluginType)plugin->type, "x86_64",
-			   "/usr/lib/carla/carla-bridge-native", plugin->label,
-			   plugin->filename, plugin->uniqueId);
-
-	return carla_post_load_callback(priv, props);
-}
+// ----------------------------------------------------------------------------
 
 bool carla_priv_show_gui_callback(obs_properties_t *props,
 				  obs_property_t *property, void *data)
@@ -344,11 +419,11 @@ bool carla_priv_show_gui_callback(obs_properties_t *props,
 	return false;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 void carla_priv_free(void *data)
 {
 	free(data);
 }
 
-// --------------------------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------

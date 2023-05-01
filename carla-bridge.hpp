@@ -29,90 +29,27 @@ struct carla_param_data {
 
 // FIXME
 struct carla_bridge_info {
-	uint32_t aIns, aOuts;
-	uint32_t cvIns, cvOuts;
-	uint32_t mIns, mOuts;
-	PluginCategory category;
-	uint optionsAvailable;
-	CarlaString name;
+	PluginType ptype = PLUGIN_NONE;
+	uint32_t hints = 0;
+	uint32_t options = PLUGIN_OPTIONS_NULL;
+	uint32_t numAudioIns = 0;
+	uint32_t numAudioOuts = 0;
+	CarlaString filename;
 	CarlaString label;
-	CarlaString maker;
-	CarlaString copyright;
-	const char **aInNames;
-	const char **aOutNames;
-	const char **cvInNames;
-	const char **cvOutNames;
+	int64_t uniqueId = 0;
 	std::vector<uint8_t> chunk;
-
-	carla_bridge_info()
-		: aIns(0),
-		  aOuts(0),
-		  cvIns(0),
-		  cvOuts(0),
-		  mIns(0),
-		  mOuts(0),
-		  category(PLUGIN_CATEGORY_NONE),
-		  optionsAvailable(0),
-		  name(),
-		  label(),
-		  maker(),
-		  copyright(),
-		  aInNames(nullptr),
-		  aOutNames(nullptr),
-		  cvInNames(nullptr),
-		  cvOutNames(nullptr),
-		  chunk()
-	{
-	}
-
-	~carla_bridge_info() { clear(); }
 
 	void clear()
 	{
-		if (aInNames != nullptr) {
-			CARLA_SAFE_ASSERT_INT(aIns > 0, aIns);
-
-			for (uint32_t i = 0; i < aIns; ++i)
-				delete[] aInNames[i];
-
-			delete[] aInNames;
-			aInNames = nullptr;
-		}
-
-		if (aOutNames != nullptr) {
-			CARLA_SAFE_ASSERT_INT(aOuts > 0, aOuts);
-
-			for (uint32_t i = 0; i < aOuts; ++i)
-				delete[] aOutNames[i];
-
-			delete[] aOutNames;
-			aOutNames = nullptr;
-		}
-
-		if (cvInNames != nullptr) {
-			CARLA_SAFE_ASSERT_INT(cvIns > 0, cvIns);
-
-			for (uint32_t i = 0; i < cvIns; ++i)
-				delete[] cvInNames[i];
-
-			delete[] cvInNames;
-			cvInNames = nullptr;
-		}
-
-		if (cvOutNames != nullptr) {
-			CARLA_SAFE_ASSERT_INT(cvOuts > 0, cvOuts);
-
-			for (uint32_t i = 0; i < cvOuts; ++i)
-				delete[] cvOutNames[i];
-
-			delete[] cvOutNames;
-			cvOutNames = nullptr;
-		}
-
-		aIns = aOuts = cvIns = cvOuts = 0;
+		ptype = PLUGIN_NONE;
+		hints = 0;
+		options = PLUGIN_OPTIONS_NULL;
+		numAudioIns = numAudioOuts = 0;
+		uniqueId = 0;
+		label.clear();
+		filename.clear();
+		chunk.clear();
 	}
-
-	CARLA_DECLARE_NON_COPYABLE(carla_bridge_info)
 };
 
 struct carla_bridge_callback {
@@ -127,8 +64,8 @@ struct carla_bridge {
 	uint32_t paramCount = 0;
 	struct carla_param_data *paramDetails = nullptr;
 
-	// FIXME
-	carla_bridge_info fInfo;
+	// cached plugin info
+	carla_bridge_info info;
 
 	~carla_bridge() { delete[] paramDetails; }
 
@@ -152,6 +89,9 @@ struct carla_bridge {
 	void activate();
 	void deactivate();
 	void process(float *buffers[2], uint32_t frames);
+
+	void save_and_wait();
+	void load_chunk();
 
 private:
 	char shmIdsStr[6 * 4 + 1] = {};
