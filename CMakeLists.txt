@@ -5,16 +5,17 @@ find_qt(COMPONENTS Core Gui Widgets)
 find_package(PkgConfig)
 
 # optional: finds correct plugin binary type
-if(NOT WIN32)
-  pkg_check_modules(LIBMAGIC "libmagic")
-else()
+#if(NOT WIN32)
+  #pkg_check_modules(LIBMAGIC "libmagic")
+#else()
   set(LIBMAGIC_FOUND FALSE)
-  set(X11_FOUND FALSE)
-endif()
+#endif()
 
 if(NOT (APPLE OR WIN32))
   pkg_check_modules(X11 "x11")
   set(CARLA_EXTRA_LIBS "dl" "rt")
+else()
+  set(X11_FOUND FALSE)
 endif()
 
 ###############################################################################
@@ -60,8 +61,8 @@ target_compile_definitions(carla-patchbay PRIVATE
   CARLA_PLUGIN_ONLY_BRIDGE
   STATIC_PLUGIN_TARGET
   REAL_BUILD
-  $<${LIBMAGIC_FOUND}:HAVE_LIBMAGIC>
-  $<${X11_FOUND}:HAVE_X11>
+  #"$<${LIBMAGIC_FOUND}:HAVE_LIBMAGIC>"
+  "$<${X11_FOUND}:HAVE_X11>"
 )
 
 ###############################################################################
