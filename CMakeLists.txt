@@ -5,11 +5,11 @@ find_qt(COMPONENTS Core Gui Widgets)
 find_package(PkgConfig)
 
 # optional: finds correct plugin binary type
-#if(NOT WIN32)
-  #pkg_check_modules(LIBMAGIC "libmagic")
-#else()
+if(NOT WIN32)
+  pkg_check_modules(LIBMAGIC "libmagic")
+else()
   set(LIBMAGIC_FOUND FALSE)
-#endif()
+endif()
 
 if(NOT (APPLE OR WIN32))
   pkg_check_modules(X11 "x11")
@@ -48,8 +48,8 @@ target_compile_definitions(carla-bridge PRIVATE
   CARLA_PLUGIN_ONLY_BRIDGE
   STATIC_PLUGIN_TARGET
   REAL_BUILD
-  #$<${LIBMAGIC_FOUND}:HAVE_LIBMAGIC>
-  #$<${X11_FOUND}:HAVE_X11>
+  $<$<${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
+  $<$<${X11_FOUND}>:HAVE_X11>
 )
 
 target_compile_definitions(carla-patchbay PRIVATE
@@ -61,8 +61,8 @@ target_compile_definitions(carla-patchbay PRIVATE
   CARLA_PLUGIN_ONLY_BRIDGE
   STATIC_PLUGIN_TARGET
   REAL_BUILD
-  #"$<${LIBMAGIC_FOUND}:HAVE_LIBMAGIC>"
-  "$<${X11_FOUND}:HAVE_X11>"
+  $<$<${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
+  $<$<${X11_FOUND}>:HAVE_X11>
 )
 
 ###############################################################################
@@ -128,7 +128,7 @@ target_link_libraries(carla-patchbay PRIVATE
   Qt::Core
   Qt::Gui
   Qt::Widgets
-  #${CARLA_EXTRA_LIBS}
+  ${CARLA_EXTRA_LIBS}
   ${LIBMAGIC_LIBRARIES}
   ${X11_LIBRARIES}
 )
