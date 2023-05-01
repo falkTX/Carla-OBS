@@ -48,8 +48,8 @@ target_compile_definitions(carla-bridge PRIVATE
   CARLA_PLUGIN_ONLY_BRIDGE
   STATIC_PLUGIN_TARGET
   REAL_BUILD
-  $<$<${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
-  $<$<${X11_FOUND}>:HAVE_X11>
+  $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
+  $<$<BOOL:${X11_FOUND}>:HAVE_X11>
 )
 
 target_compile_definitions(carla-patchbay PRIVATE
@@ -61,8 +61,8 @@ target_compile_definitions(carla-patchbay PRIVATE
   CARLA_PLUGIN_ONLY_BRIDGE
   STATIC_PLUGIN_TARGET
   REAL_BUILD
-  $<$<${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
-  $<$<${X11_FOUND}>:HAVE_X11>
+  $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
+  $<$<BOOL:${X11_FOUND}>:HAVE_X11>
 )
 
 ###############################################################################
