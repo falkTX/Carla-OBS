@@ -115,7 +115,7 @@ target_link_libraries(carla-bridge PRIVATE
   Qt::Core
   Qt::Gui
   Qt::Widgets
-  #${CARLA_EXTRA_LIBS}
+  ${CARLA_EXTRA_LIBS}
   #${LIBMAGIC_LIBRARIES}
 )
 
