@@ -13,7 +13,6 @@ endif()
 
 if(NOT (APPLE OR WIN32))
   pkg_check_modules(X11 "x11")
-  set(CARLA_EXTRA_LIBS "dl" "rt")
 else()
   set(X11_FOUND FALSE)
 endif()
@@ -115,7 +114,6 @@ target_link_libraries(carla-bridge PRIVATE
   Qt::Core
   Qt::Gui
   Qt::Widgets
-  ${CARLA_EXTRA_LIBS}
   #${LIBMAGIC_LIBRARIES}
 )
 
@@ -128,7 +126,6 @@ target_link_libraries(carla-patchbay PRIVATE
   Qt::Core
   Qt::Gui
   Qt::Widgets
-  ${CARLA_EXTRA_LIBS}
   ${LIBMAGIC_LIBRARIES}
   ${X11_LIBRARIES}
 )

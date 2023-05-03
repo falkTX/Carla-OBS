@@ -2,8 +2,6 @@
 # Copyright (C) 2023 Filipe Coelho <falktx@falktx.com>
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-add_library(carla_lilv INTERFACE)
-
 ###############################################################################
 # base config
 
@@ -23,6 +21,12 @@ set(carla_lilv_include_directories
   carla/source/includes
   ${carla_lilv_basedir}/config
 )
+
+if(APPLE OR WIN32)
+  set(carla_lilv_extra_libs "m")
+else()
+  set(carla_lilv_extra_libs "dl" "m" "rt")
+endif()
 
 ###############################################################################
 # serd
@@ -53,6 +57,8 @@ set_property(TARGET carla_lilv_sord PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 target_compile_options(carla_lilv_sord PRIVATE
   ${carla_lilv_compile_options}
+  # workaround compiler bug, see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=109585
+  -fno-strict-aliasing
 )
 
 target_include_directories(carla_lilv_sord PRIVATE
@@ -123,9 +129,12 @@ target_sources(carla_lilv_lilv PRIVATE
 ###############################################################################
 # combined target
 
+add_library(carla_lilv INTERFACE)
+
 target_link_libraries(carla_lilv INTERFACE
   carla_lilv_serd
   carla_lilv_sord
   carla_lilv_sratom
   carla_lilv_lilv
+  ${carla_lilv_extra_libs}
 )
