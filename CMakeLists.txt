@@ -102,7 +102,7 @@ target_link_libraries(
   carla-bridge
   PRIVATE OBS::carla_jackbridge
           OBS::carla_lilv
-          OBS::carla_water
+          #OBS::carla_water
           OBS::libobs
           # OBS::frontend-api
           Qt::Core
@@ -115,7 +115,7 @@ target_link_libraries(
   carla-patchbay
   PRIVATE OBS::carla_jackbridge
           OBS::carla_rtmempool
-          OBS::carla_water
+          #OBS::carla_water
           OBS::libobs
           # OBS::frontend-api
           Qt::Core
@@ -135,35 +135,37 @@ target_link_options(carla-patchbay PRIVATE -Wl,--no-undefined)
 target_sources(
   carla-bridge
   PRIVATE carla.c
-          carla-bridge.cpp
-          carla-bridge-wrapper.cpp
+          #carla-bridge.cpp
+          #carla-bridge-wrapper.cpp
           common.c
           qtutils.cpp
-          carla/source/backend/utils/CachedPlugins.cpp
-          carla/source/backend/utils/JUCE.cpp
-          carla/source/backend/utils/Information.cpp
-          carla/source/frontend/carla_frontend.cpp
-          carla/source/frontend/pluginlist/pluginlistdialog.cpp
-          carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
-          carla/source/utils/CarlaBridgeUtils.cpp)
+          #carla/source/backend/utils/CachedPlugins.cpp
+          #carla/source/backend/utils/JUCE.cpp
+          #carla/source/backend/utils/Information.cpp
+          #carla/source/frontend/carla_frontend.cpp
+          #carla/source/frontend/pluginlist/pluginlistdialog.cpp
+          #carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
+          #carla/source/utils/CarlaBridgeUtils.cpp
+)
 
 target_sources(
   carla-patchbay
   PRIVATE carla.c
-          carla-patchbay-wrapper.c
+          #carla-patchbay-wrapper.c
           common.c
           qtutils.cpp
-          carla/source/backend/engine/CarlaEngine.cpp
-          carla/source/backend/engine/CarlaEngineClient.cpp
-          carla/source/backend/engine/CarlaEngineData.cpp
-          carla/source/backend/engine/CarlaEngineGraph.cpp
-          carla/source/backend/engine/CarlaEngineInternal.cpp
-          carla/source/backend/engine/CarlaEngineNative.cpp
-          carla/source/backend/engine/CarlaEnginePorts.cpp
-          carla/source/backend/engine/CarlaEngineRunner.cpp
-          carla/source/backend/plugin/CarlaPlugin.cpp
-          carla/source/backend/plugin/CarlaPluginBridge.cpp
-          carla/source/backend/plugin/CarlaPluginInternal.cpp)
+          #carla/source/backend/engine/CarlaEngine.cpp
+          #carla/source/backend/engine/CarlaEngineClient.cpp
+          #carla/source/backend/engine/CarlaEngineData.cpp
+          #carla/source/backend/engine/CarlaEngineGraph.cpp
+          #carla/source/backend/engine/CarlaEngineInternal.cpp
+          #carla/source/backend/engine/CarlaEngineNative.cpp
+          #carla/source/backend/engine/CarlaEnginePorts.cpp
+          #carla/source/backend/engine/CarlaEngineRunner.cpp
+          #carla/source/backend/plugin/CarlaPlugin.cpp
+          #carla/source/backend/plugin/CarlaPluginBridge.cpp
+          #carla/source/backend/plugin/CarlaPluginInternal.cpp
+)
 
 # ######################################################################################################################
 

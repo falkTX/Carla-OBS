@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
+#if 0 // TEST
+
 #ifndef CARLA_MODULE_ID
 #error CARLA_MODULE_ID undefined
 #endif
@@ -416,3 +418,5 @@ bool obs_module_load(void)
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+
+#endif // TEST
