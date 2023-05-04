@@ -361,7 +361,7 @@ OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("carla", "en-US")
 MODULE_EXPORT const char *obs_module_description(void)
 {
-	return CARLA_MODULE_NAME;
+	return "carla patchbay"; // CARLA_MODULE_NAME;
 }
 
 bool obs_module_load(void)
