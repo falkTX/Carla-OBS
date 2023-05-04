@@ -46,6 +46,22 @@ add_library(OBS::carla_water ALIAS carla_water)
 add_library(carla-bridge MODULE)
 add_library(OBS::carla-bridge ALIAS carla-bridge)
 
+target_link_libraries(carla-bridge
+  PRIVATE # OBS::carla_jackbridge OBS::carla_lilv OBS::carla_water
+          OBS::libobs
+          # OBS::frontend-api Qt::Core Qt::Gui Qt::Widgets ${LIBMAGIC_LIBRARIES}
+)
+
+target_sources(carla-bridge
+  PRIVATE carla.c
+          # carla-bridge.cpp carla-bridge-wrapper.cpp common.c qtutils.cpp carla/source/backend/utils/CachedPlugins.cpp carla/source/backend/utils/JUCE.cpp
+#carla/source/backend/utils/Information.cpp carla/source/frontend/carla_frontend.cpp
+#carla/source/frontend/pluginlist/pluginlistdialog.cpp carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
+#carla/source/utils/CarlaBridgeUtils.cpp
+)
+
+set_target_properties(carla-bridge PROPERTIES AUTOMOC ON AUTOUIC ON AUTORCC ON FOLDER "plugins/carla" PREFIX "")
+
 # Setup carla-patchbay target
 add_library(carla-patchbay MODULE)
 add_library(OBS::carla-patchbay ALIAS carla-patchbay)
@@ -56,13 +72,10 @@ target_sources(carla-patchbay PRIVATE carla.c)
 
 set_target_properties(carla-patchbay PROPERTIES FOLDER "plugins/carla")
 
+setup_plugin_target(carla-bridge)
 setup_plugin_target(carla-patchbay)
 
 # ######################################################################################################################
-
-# set_target_properties( carla-bridge PROPERTIES AUTOMOC ON AUTOUIC ON AUTORCC ON FOLDER plugins PREFIX "")
-
-# set_target_properties(carla-patchbay PROPERTIES FOLDER plugins PREFIX "")
 
 # if(_QT_VERSION EQUAL 6 AND OS_WINDOWS) set_target_properties(carla-bridge PROPERTIES AUTORCC_OPTIONS
 # "--format-version;1") endif()
