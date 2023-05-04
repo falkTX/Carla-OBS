@@ -31,20 +31,13 @@ else()
   set(X11_FOUND FALSE)
 endif()
 
-# Import extra carla libs
-# include(cmake/jackbridge.cmake)
-# include(cmake/lilv.cmake)
-# include(cmake/rtmempool.cmake)
+# Import extra carla libs include(cmake/jackbridge.cmake) include(cmake/lilv.cmake) include(cmake/rtmempool.cmake)
 # include(cmake/water.cmake)
 
-# add_library(OBS::carla_jackbridge ALIAS carla_jackbridge)
-# add_library(OBS::carla_lilv ALIAS carla_lilv)
-# add_library(OBS::carla_rtmempool ALIAS carla_rtmempool)
-# add_library(OBS::carla_water ALIAS carla_water)
+# add_library(OBS::carla_jackbridge ALIAS carla_jackbridge) add_library(OBS::carla_lilv ALIAS carla_lilv)
+# add_library(OBS::carla_rtmempool ALIAS carla_rtmempool) add_library(OBS::carla_water ALIAS carla_water)
 
-# Setup carla-bridge target
-# add_library(carla-bridge MODULE)
-# add_library(OBS::carla-bridge ALIAS carla-bridge)
+# Setup carla-bridge target add_library(carla-bridge MODULE) add_library(OBS::carla-bridge ALIAS carla-bridge)
 
 # target_link_libraries(carla-bridge PRIVATE OBS::libobs)
 
