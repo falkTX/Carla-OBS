@@ -15,6 +15,10 @@ set_target_properties(
              PREFIX ""
              PROJECT_LABEL "Carla Patchbay")
 
+if(_QT_VERSION EQUAL 6 AND OS_WINDOWS)
+  set_target_properties(carla-bridge PROPERTIES AUTORCC_OPTIONS "--format-version;1")
+endif()
+
 # ######################################################################################################################
 
 setup_plugin_target(carla-bridge)

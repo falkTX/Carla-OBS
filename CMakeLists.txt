@@ -19,15 +19,10 @@ endif()
 
 # ######################################################################################################################
 
-include(cmake/jackbridge.cmake)
-include(cmake/lilv.cmake)
-include(cmake/rtmempool.cmake)
-include(cmake/water.cmake)
+# include(cmake/jackbridge.cmake) include(cmake/lilv.cmake) include(cmake/rtmempool.cmake) include(cmake/water.cmake)
 
-add_library(OBS::carla_jackbridge ALIAS carla_jackbridge)
-add_library(OBS::carla_lilv ALIAS carla_lilv)
-add_library(OBS::carla_rtmempool ALIAS carla_rtmempool)
-add_library(OBS::carla_water ALIAS carla_water)
+# add_library(OBS::carla_jackbridge ALIAS carla_jackbridge) add_library(OBS::carla_lilv ALIAS carla_lilv)
+# add_library(OBS::carla_rtmempool ALIAS carla_rtmempool) add_library(OBS::carla_water ALIAS carla_water)
 
 # ######################################################################################################################
 
@@ -100,9 +95,7 @@ target_include_directories(
 
 target_link_libraries(
   carla-bridge
-  PRIVATE OBS::carla_jackbridge
-          OBS::carla_lilv
-          #OBS::carla_water
+  PRIVATE # OBS::carla_jackbridge OBS::carla_lilv OBS::carla_water
           OBS::libobs
           # OBS::frontend-api
           Qt::Core
@@ -113,58 +106,44 @@ target_link_libraries(
 
 target_link_libraries(
   carla-patchbay
-  PRIVATE OBS::carla_jackbridge
-          OBS::carla_rtmempool
-          #OBS::carla_water
+  PRIVATE # OBS::carla_jackbridge OBS::carla_rtmempool OBS::carla_water
           OBS::libobs
           # OBS::frontend-api
-          Qt::Core
-          Qt::Gui
-          Qt::Widgets
-          ${LIBMAGIC_LIBRARIES}
-          ${X11_LIBRARIES})
+          Qt::Core Qt::Gui Qt::Widgets ${LIBMAGIC_LIBRARIES} ${X11_LIBRARIES})
 
 # ######################################################################################################################
 
-target_link_options(carla-bridge PRIVATE -Wl,--no-undefined)
-
-target_link_options(carla-patchbay PRIVATE -Wl,--no-undefined)
+if(NOT OS_MACOS)
+  target_link_options(carla-bridge PRIVATE -Wl,--no-undefined)
+  target_link_options(carla-patchbay PRIVATE -Wl,--no-undefined)
+endif()
 
 # ######################################################################################################################
 
 target_sources(
   carla-bridge
   PRIVATE carla.c
-          #carla-bridge.cpp
-          #carla-bridge-wrapper.cpp
+          # carla-bridge.cpp carla-bridge-wrapper.cpp
           common.c
           qtutils.cpp
-          #carla/source/backend/utils/CachedPlugins.cpp
-          #carla/source/backend/utils/JUCE.cpp
-          #carla/source/backend/utils/Information.cpp
-          #carla/source/frontend/carla_frontend.cpp
-          #carla/source/frontend/pluginlist/pluginlistdialog.cpp
-          #carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
-          #carla/source/utils/CarlaBridgeUtils.cpp
+          # carla/source/backend/utils/CachedPlugins.cpp carla/source/backend/utils/JUCE.cpp
+          # carla/source/backend/utils/Information.cpp carla/source/frontend/carla_frontend.cpp
+          # carla/source/frontend/pluginlist/pluginlistdialog.cpp
+          # carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp carla/source/utils/CarlaBridgeUtils.cpp
 )
 
 target_sources(
   carla-patchbay
   PRIVATE carla.c
-          #carla-patchbay-wrapper.c
+          # carla-patchbay-wrapper.c
           common.c
           qtutils.cpp
-          #carla/source/backend/engine/CarlaEngine.cpp
-          #carla/source/backend/engine/CarlaEngineClient.cpp
-          #carla/source/backend/engine/CarlaEngineData.cpp
-          #carla/source/backend/engine/CarlaEngineGraph.cpp
-          #carla/source/backend/engine/CarlaEngineInternal.cpp
-          #carla/source/backend/engine/CarlaEngineNative.cpp
-          #carla/source/backend/engine/CarlaEnginePorts.cpp
-          #carla/source/backend/engine/CarlaEngineRunner.cpp
-          #carla/source/backend/plugin/CarlaPlugin.cpp
-          #carla/source/backend/plugin/CarlaPluginBridge.cpp
-          #carla/source/backend/plugin/CarlaPluginInternal.cpp
+          # carla/source/backend/engine/CarlaEngine.cpp carla/source/backend/engine/CarlaEngineClient.cpp
+          # carla/source/backend/engine/CarlaEngineData.cpp carla/source/backend/engine/CarlaEngineGraph.cpp
+          # carla/source/backend/engine/CarlaEngineInternal.cpp carla/source/backend/engine/CarlaEngineNative.cpp
+          # carla/source/backend/engine/CarlaEnginePorts.cpp carla/source/backend/engine/CarlaEngineRunner.cpp
+          # carla/source/backend/plugin/CarlaPlugin.cpp carla/source/backend/plugin/CarlaPluginBridge.cpp
+          # carla/source/backend/plugin/CarlaPluginInternal.cpp
 )
 
 # ######################################################################################################################
@@ -182,5 +161,10 @@ set_target_properties_obs(
              PREFIX "" PROJECT_LABEL "Carla Bridge")
 
 set_target_properties_obs(carla-patchbay PROPERTIES FOLDER plugins PREFIX "" PROJECT_LABEL "Carla Patchbay")
+
+set_property(
+  TARGET carla-bridge
+  APPEND
+  PROPERTY AUTORCC_OPTIONS --format-version 1)
 
 # ######################################################################################################################
