@@ -177,13 +177,8 @@ set_target_properties_obs(
              AUTOUIC ON
              AUTORCC ON
              FOLDER plugins
-             PREFIX ""
-             PROJECT_LABEL "Carla Bridge")
+             PREFIX "" PROJECT_LABEL "Carla Bridge")
 
-set_target_properties_obs(
-  carla-patchbay
-  PROPERTIES FOLDER plugins
-             PREFIX ""
-             PROJECT_LABEL "Carla Patchbay")
+set_target_properties_obs(carla-patchbay PROPERTIES FOLDER plugins PREFIX "" PROJECT_LABEL "Carla Patchbay")
 
 # ######################################################################################################################
