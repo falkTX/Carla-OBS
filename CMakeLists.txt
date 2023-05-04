@@ -28,7 +28,8 @@ endif()
 
 # add_library(carla-bridge MODULE) add_library(OBS::carla-bridge ALIAS carla-bridge)
 
-# add_library(carla-patchbay MODULE) add_library(OBS::carla-patchbay ALIAS carla-patchbay)
+add_library(carla-patchbay MODULE)
+add_library(OBS::carla-patchbay ALIAS carla-patchbay)
 
 # ######################################################################################################################
 
@@ -36,23 +37,37 @@ endif()
 # CARLA_MODULE_ID="carla_bridge" CARLA_MODULE_NAME="Carla Bridge" CARLA_PLUGIN_ONLY_BRIDGE STATIC_PLUGIN_TARGET
 # REAL_BUILD $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC> $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
 
-# target_compile_definitions( carla-patchbay PRIVATE BUILDING_CARLA CARLA_BACKEND_NAMESPACE=CarlaPatchbayOBS
-# CARLA_MODULE_ID="carla_patchbay" CARLA_MODULE_NAME="Carla Patchbay" CARLA_PLUGIN_BUILD CARLA_PLUGIN_ONLY_BRIDGE
-# STATIC_PLUGIN_TARGET REAL_BUILD $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC> $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
+target_compile_definitions(carla-patchbay
+  PRIVATE BUILDING_CARLA
+          CARLA_BACKEND_NAMESPACE=CarlaPatchbayOBS
+          CARLA_MODULE_ID="carla_patchbay"
+          CARLA_MODULE_NAME="Carla Patchbay"
+          CARLA_PLUGIN_BUILD
+          CARLA_PLUGIN_ONLY_BRIDGE
+          STATIC_PLUGIN_TARGET
+          REAL_BUILD
+          $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
+          $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
 
 # ######################################################################################################################
 
 # target_compile_options(carla-bridge PRIVATE -Wno-error -Wno-vla)
 
-# target_compile_options(carla-patchbay PRIVATE -Wno-error -Wno-vla)
+target_compile_options(carla-patchbay PRIVATE -Wno-error -Wno-vla)
 
 # ######################################################################################################################
 
 # target_include_directories( carla-bridge PRIVATE carla/source carla/source/backend carla/source/frontend
 # carla/source/frontend/utils carla/source/includes carla/source/modules carla/source/utils ${LIBMAGIC_INCLUDE_DIRS} )
 
-# target_include_directories( carla-patchbay PRIVATE carla/source carla/source/backend carla/source/includes
-# carla/source/modules carla/source/utils ${LIBMAGIC_INCLUDE_DIRS} ${X11_INCLUDE_DIRS})
+target_include_directories(carla-patchbay
+  PRIVATE carla/source
+          carla/source/backend
+          carla/source/includes
+          carla/source/modules
+          carla/source/utils
+          ${LIBMAGIC_INCLUDE_DIRS}
+          ${X11_INCLUDE_DIRS})
 
 # ######################################################################################################################
 
@@ -77,13 +92,16 @@ endif()
 # carla/source/frontend/pluginlist/pluginlistdialog.cpp carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
 # carla/source/utils/CarlaBridgeUtils.cpp )
 
-# target_sources( carla-patchbay PRIVATE carla.c carla-patchbay-wrapper.c common.c qtutils.cpp
-# carla/source/backend/engine/CarlaEngine.cpp carla/source/backend/engine/CarlaEngineClient.cpp
-# carla/source/backend/engine/CarlaEngineData.cpp carla/source/backend/engine/CarlaEngineGraph.cpp
-# carla/source/backend/engine/CarlaEngineInternal.cpp carla/source/backend/engine/CarlaEngineNative.cpp
-# carla/source/backend/engine/CarlaEnginePorts.cpp carla/source/backend/engine/CarlaEngineRunner.cpp
-# carla/source/backend/plugin/CarlaPlugin.cpp carla/source/backend/plugin/CarlaPluginBridge.cpp
-# carla/source/backend/plugin/CarlaPluginInternal.cpp )
+target_sources(carla-patchbay
+  PRIVATE carla.c
+          # carla-patchbay-wrapper.c common.c qtutils.cpp
+          # carla/source/backend/engine/CarlaEngine.cpp carla/source/backend/engine/CarlaEngineClient.cpp
+          # carla/source/backend/engine/CarlaEngineData.cpp carla/source/backend/engine/CarlaEngineGraph.cpp
+          # carla/source/backend/engine/CarlaEngineInternal.cpp carla/source/backend/engine/CarlaEngineNative.cpp
+          # carla/source/backend/engine/CarlaEnginePorts.cpp carla/source/backend/engine/CarlaEngineRunner.cpp
+          # carla/source/backend/plugin/CarlaPlugin.cpp carla/source/backend/plugin/CarlaPluginBridge.cpp
+          # carla/source/backend/plugin/CarlaPluginInternal.cpp
+)
 
 # ######################################################################################################################
 
