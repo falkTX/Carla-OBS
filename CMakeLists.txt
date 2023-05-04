@@ -1,22 +1,21 @@
-message("hello world")
+cmake_minimum_required(VERSION 3.16...3.25)
 
-# cmake_minimum_required(VERSION 3.16...3.25)
+find_qt(COMPONENTS Core Gui Widgets)
 
-# find_qt(COMPONENTS Core Gui Widgets)
+find_package(PkgConfig)
 
-# find_package(PkgConfig)
+# optional: finds correct plugin binary type
+if(NOT OS_WINDOWS)
+  pkg_check_modules(LIBMAGIC "libmagic")
+else()
+  set(LIBMAGIC_FOUND FALSE)
+endif()
 
-# optional: finds correct plugin binary type if(NOT OS_WINDOWS)
-# pkg_check_modules(LIBMAGIC "libmagic")
-# else()
-# set(LIBMAGIC_FOUND FALSE)
-# endif()
-
-# if(NOT (OS_MACOS OR OS_WINDOWS))
-# pkg_check_modules(X11 "x11")
-# else()
-# set(X11_FOUND FALSE)
-# endif()
+if(NOT (OS_MACOS OR OS_WINDOWS))
+  pkg_check_modules(X11 "x11")
+else()
+  set(X11_FOUND FALSE)
+endif()
 
 # ######################################################################################################################
 
@@ -59,30 +58,24 @@ message("hello world")
 
 # target_link_directories(carla PRIVATE ${LIBMAGIC_LIBRARY_DIRS} )
 
-# target_link_libraries(
-# carla-bridge PRIVATE # OBS::carla_jackbridge OBS::carla_lilv OBS::carla_water
-# OBS::libobs OBS::frontend-api Qt::Core Qt::Gui Qt::Widgets ${LIBMAGIC_LIBRARIES}
-# )
+# target_link_libraries( carla-bridge PRIVATE # OBS::carla_jackbridge OBS::carla_lilv OBS::carla_water OBS::libobs
+# OBS::frontend-api Qt::Core Qt::Gui Qt::Widgets ${LIBMAGIC_LIBRARIES} )
 
 # target_link_libraries( carla-patchbay PRIVATE # OBS::carla_jackbridge OBS::carla_rtmempool OBS::carla_water
 # OBS::libobs OBS::frontend-api Qt::Core Qt::Gui Qt::Widgets ${LIBMAGIC_LIBRARIES} ${X11_LIBRARIES})
 
 # ######################################################################################################################
 
-# if(NOT OS_MACOS)
-# target_link_options(carla-bridge PRIVATE -Wl,--no-undefined) target_link_options(carla-patchbay PRIVATE
-# -Wl,--no-undefined)
-# endif()
+# if(NOT OS_MACOS) target_link_options(carla-bridge PRIVATE -Wl,--no-undefined) target_link_options(carla-patchbay
+# PRIVATE -Wl,--no-undefined) endif()
 
 # ######################################################################################################################
 
-# target_sources(
-# carla-bridge PRIVATE carla.c
-# carla-bridge.cpp carla-bridge-wrapper.cpp common.c qtutils.cpp carla/source/backend/utils/CachedPlugins.cpp
-# carla/source/backend/utils/JUCE.cpp carla/source/backend/utils/Information.cpp
-# carla/source/frontend/carla_frontend.cpp carla/source/frontend/pluginlist/pluginlistdialog.cpp
-# carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp carla/source/utils/CarlaBridgeUtils.cpp
-# )
+# target_sources( carla-bridge PRIVATE carla.c carla-bridge.cpp carla-bridge-wrapper.cpp common.c qtutils.cpp
+# carla/source/backend/utils/CachedPlugins.cpp carla/source/backend/utils/JUCE.cpp
+# carla/source/backend/utils/Information.cpp carla/source/frontend/carla_frontend.cpp
+# carla/source/frontend/pluginlist/pluginlistdialog.cpp carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
+# carla/source/utils/CarlaBridgeUtils.cpp )
 
 # target_sources( carla-patchbay PRIVATE carla.c carla-patchbay-wrapper.c common.c qtutils.cpp
 # carla/source/backend/engine/CarlaEngine.cpp carla/source/backend/engine/CarlaEngineClient.cpp
