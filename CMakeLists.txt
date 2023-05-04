@@ -37,37 +37,37 @@ add_library(OBS::carla-patchbay ALIAS carla-patchbay)
 # CARLA_MODULE_ID="carla_bridge" CARLA_MODULE_NAME="Carla Bridge" CARLA_PLUGIN_ONLY_BRIDGE STATIC_PLUGIN_TARGET
 # REAL_BUILD $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC> $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
 
-target_compile_definitions(carla-patchbay
-  PRIVATE BUILDING_CARLA
-          CARLA_BACKEND_NAMESPACE=CarlaPatchbayOBS
-          CARLA_MODULE_ID="carla_patchbay"
-          CARLA_MODULE_NAME="Carla Patchbay"
-          CARLA_PLUGIN_BUILD
-          CARLA_PLUGIN_ONLY_BRIDGE
-          STATIC_PLUGIN_TARGET
-          REAL_BUILD
-          $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
-          $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
+# target_compile_definitions(carla-patchbay
+#   PRIVATE BUILDING_CARLA
+#           CARLA_BACKEND_NAMESPACE=CarlaPatchbayOBS
+#           CARLA_MODULE_ID="carla_patchbay"
+#           CARLA_MODULE_NAME="Carla Patchbay"
+#           CARLA_PLUGIN_BUILD
+#           CARLA_PLUGIN_ONLY_BRIDGE
+#           STATIC_PLUGIN_TARGET
+#           REAL_BUILD
+#           $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
+#           $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
 
 # ######################################################################################################################
 
 # target_compile_options(carla-bridge PRIVATE -Wno-error -Wno-vla)
 
-target_compile_options(carla-patchbay PRIVATE -Wno-error -Wno-vla)
+# target_compile_options(carla-patchbay PRIVATE -Wno-error -Wno-vla)
 
 # ######################################################################################################################
 
 # target_include_directories( carla-bridge PRIVATE carla/source carla/source/backend carla/source/frontend
 # carla/source/frontend/utils carla/source/includes carla/source/modules carla/source/utils ${LIBMAGIC_INCLUDE_DIRS} )
 
-target_include_directories(carla-patchbay
-  PRIVATE carla/source
-          carla/source/backend
-          carla/source/includes
-          carla/source/modules
-          carla/source/utils
-          ${LIBMAGIC_INCLUDE_DIRS}
-          ${X11_INCLUDE_DIRS})
+# target_include_directories(carla-patchbay
+#   PRIVATE carla/source
+#           carla/source/backend
+#           carla/source/includes
+#           carla/source/modules
+#           carla/source/utils
+#           ${LIBMAGIC_INCLUDE_DIRS}
+#           ${X11_INCLUDE_DIRS})
 
 # ######################################################################################################################
 

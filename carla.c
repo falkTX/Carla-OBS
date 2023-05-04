@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
+int test = 1;
+
 #if 0 // TEST
 
 #ifndef CARLA_MODULE_ID
@@ -348,11 +350,13 @@ static void carla_obs_load(void *data, obs_data_t *settings)
 	struct carla_data *carla = data;
 	carla_priv_load(carla->priv, settings);
 }
+#endif
 
 // --------------------------------------------------------------------------------------------------------------------
 
+// CARLA_MODULE_ID
 OBS_DECLARE_MODULE()
-OBS_MODULE_USE_DEFAULT_LOCALE(CARLA_MODULE_ID, "en-US")
+OBS_MODULE_USE_DEFAULT_LOCALE("carla", "en-US")
 MODULE_EXPORT const char *obs_module_description(void)
 {
 	return CARLA_MODULE_NAME;
@@ -360,6 +364,7 @@ MODULE_EXPORT const char *obs_module_description(void)
 
 bool obs_module_load(void)
 {
+#if 0
 	static const struct obs_source_info filter = {
 		.id = CARLA_MODULE_ID "_filter",
 		.type = OBS_SOURCE_TYPE_FILTER,
@@ -415,8 +420,8 @@ bool obs_module_load(void)
 	obs_register_source(&input);
 
 	return true;
+#endif // TEST
+	return false;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-
-#endif // TEST
