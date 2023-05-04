@@ -68,7 +68,8 @@ target_link_libraries(
   carla-bridge
   PRIVATE # OBS::carla_jackbridge OBS::carla_lilv OBS::carla_water
           OBS::libobs
-          # OBS::frontend-api Qt::Core Qt::Gui Qt::Widgets ${LIBMAGIC_LIBRARIES}
+          OBS::frontend-api
+          # Qt::Core Qt::Gui Qt::Widgets ${LIBMAGIC_LIBRARIES}
 )
 
 # target_link_libraries( carla-patchbay PRIVATE # OBS::carla_jackbridge OBS::carla_rtmempool OBS::carla_water
