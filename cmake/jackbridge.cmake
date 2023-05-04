@@ -1,4 +1,3 @@
-# Carla plugin for OBS Copyright (C) 2023 Filipe Coelho <falktx@falktx.com> SPDX-License-Identifier: GPL-2.0-or-later
 
 # ######################################################################################################################
 # base config
@@ -7,7 +6,7 @@ find_package(Threads REQUIRED)
 
 set(carla_jackbridge_basedir carla/source/jackbridge)
 
-if(NOT (APPLE OR WIN32))
+if(NOT (OS_MACOS OR OS_WINDOWS))
   set(carla_jackbridge_extra_libs "dl" "rt")
 endif()
 

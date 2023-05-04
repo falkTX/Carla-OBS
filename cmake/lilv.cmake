@@ -1,4 +1,3 @@
-# Carla plugin for OBS Copyright (C) 2023 Filipe Coelho <falktx@falktx.com> SPDX-License-Identifier: GPL-2.0-or-later
 
 # ######################################################################################################################
 # base config
@@ -16,7 +15,7 @@ set(carla_lilv_basedir carla/source/modules/lilv)
 
 set(carla_lilv_include_directories carla/source/includes ${carla_lilv_basedir}/config)
 
-if(APPLE OR WIN32)
+if(OS_MACOS OR OS_WINDOWS)
   set(carla_lilv_extra_libs "m")
 else()
   set(carla_lilv_extra_libs "dl" "m" "rt")

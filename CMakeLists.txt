@@ -1,17 +1,17 @@
-project(carla)
+cmake_minimum_required(VERSION 3.16...3.25)
 
 find_qt(COMPONENTS Core Gui Widgets)
 
 find_package(PkgConfig)
 
 # optional: finds correct plugin binary type
-if(NOT WIN32)
+if(NOT OS_WINDOWS)
   pkg_check_modules(LIBMAGIC "libmagic")
 else()
   set(LIBMAGIC_FOUND FALSE)
 endif()
 
-if(NOT (APPLE OR WIN32))
+if(NOT (OS_MACOS OR OS_WINDOWS))
   pkg_check_modules(X11 "x11")
 else()
   set(X11_FOUND FALSE)
@@ -132,18 +132,6 @@ target_link_options(carla-patchbay PRIVATE -Wl,--no-undefined)
 
 # ######################################################################################################################
 
-set_target_properties(
-  carla-bridge
-  PROPERTIES AUTOMOC ON
-             AUTOUIC ON
-             AUTORCC ON
-             FOLDER "plugins"
-             PROJECT_LABEL "Carla Bridge")
-
-set_target_properties(carla-patchbay PROPERTIES FOLDER "plugins" PROJECT_LABEL "Carla Patchbay")
-
-# ######################################################################################################################
-
 target_sources(
   carla-bridge
   PRIVATE carla.c
@@ -177,7 +165,25 @@ target_sources(
           carla/source/backend/plugin/CarlaPluginBridge.cpp
           carla/source/backend/plugin/CarlaPluginInternal.cpp)
 
-setup_plugin_target(carla-bridge)
-setup_plugin_target(carla-patchbay)
+# ######################################################################################################################
+
+legacy_check()
+
+# ######################################################################################################################
+
+set_target_properties_obs(
+  carla-bridge
+  PROPERTIES AUTOMOC ON
+             AUTOUIC ON
+             AUTORCC ON
+             FOLDER plugins
+             PREFIX ""
+             PROJECT_LABEL "Carla Bridge")
+
+set_target_properties_obs(
+  carla-patchbay
+  PROPERTIES FOLDER plugins
+             PREFIX ""
+             PROJECT_LABEL "Carla Patchbay")
 
 # ######################################################################################################################
