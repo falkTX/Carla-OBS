@@ -37,12 +37,6 @@ include(cmake/lilv.cmake)
 include(cmake/rtmempool.cmake)
 include(cmake/water.cmake)
 
-# Import extra carla libs
-include(cmake/jackbridge.cmake)
-include(cmake/lilv.cmake)
-include(cmake/rtmempool.cmake)
-include(cmake/water.cmake)
-
 add_library(OBS::carla_jackbridge ALIAS carla_jackbridge)
 add_library(OBS::carla_lilv ALIAS carla_lilv)
 add_library(OBS::carla_rtmempool ALIAS carla_rtmempool)
