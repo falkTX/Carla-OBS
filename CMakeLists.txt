@@ -29,35 +29,35 @@ else()
 endif()
 
 # Import extra carla libs
-include(cmake/jackbridge.cmake)
-include(cmake/lilv.cmake)
-include(cmake/rtmempool.cmake)
-include(cmake/water.cmake)
+# include(cmake/jackbridge.cmake)
+# include(cmake/lilv.cmake)
+# include(cmake/rtmempool.cmake)
+# include(cmake/water.cmake)
 
-add_library(OBS::carla_jackbridge ALIAS carla_jackbridge)
-add_library(OBS::carla_lilv ALIAS carla_lilv)
-add_library(OBS::carla_rtmempool ALIAS carla_rtmempool)
-add_library(OBS::carla_water ALIAS carla_water)
+# add_library(OBS::carla_jackbridge ALIAS carla_jackbridge)
+# add_library(OBS::carla_lilv ALIAS carla_lilv)
+# add_library(OBS::carla_rtmempool ALIAS carla_rtmempool)
+# add_library(OBS::carla_water ALIAS carla_water)
 
 # Setup carla-bridge target
-add_library(carla-bridge MODULE)
-add_library(OBS::carla-bridge ALIAS carla-bridge)
+# add_library(carla-bridge MODULE)
+# add_library(OBS::carla-bridge ALIAS carla-bridge)
 
-target_link_libraries(carla-bridge
-  PRIVATE # OBS::carla_jackbridge OBS::carla_lilv OBS::carla_water
-          OBS::libobs
-          # OBS::frontend-api Qt::Core Qt::Gui Qt::Widgets ${LIBMAGIC_LIBRARIES}
-)
+# target_link_libraries(carla-bridge
+#   PRIVATE # OBS::carla_jackbridge OBS::carla_lilv OBS::carla_water
+#           OBS::libobs
+#           # OBS::frontend-api Qt::Core Qt::Gui Qt::Widgets ${LIBMAGIC_LIBRARIES}
+# )
 
-target_sources(carla-bridge
-  PRIVATE carla.c
-          # carla-bridge.cpp carla-bridge-wrapper.cpp common.c qtutils.cpp carla/source/backend/utils/CachedPlugins.cpp carla/source/backend/utils/JUCE.cpp
-#carla/source/backend/utils/Information.cpp carla/source/frontend/carla_frontend.cpp
-#carla/source/frontend/pluginlist/pluginlistdialog.cpp carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
-#carla/source/utils/CarlaBridgeUtils.cpp
-)
+# target_sources(carla-bridge
+#   PRIVATE carla.c
+#           # carla-bridge.cpp carla-bridge-wrapper.cpp common.c qtutils.cpp carla/source/backend/utils/CachedPlugins.cpp carla/source/backend/utils/JUCE.cpp
+# #carla/source/backend/utils/Information.cpp carla/source/frontend/carla_frontend.cpp
+# #carla/source/frontend/pluginlist/pluginlistdialog.cpp carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
+# #carla/source/utils/CarlaBridgeUtils.cpp
+# )
 
-set_target_properties_obs(carla-bridge PROPERTIES AUTOMOC ON AUTOUIC ON AUTORCC ON FOLDER plugins PREFIX "")
+# set_target_properties_obs(carla-bridge PROPERTIES AUTOMOC ON AUTOUIC ON AUTORCC ON FOLDER plugins PREFIX "")
 
 # Setup carla-patchbay target
 add_library(carla-patchbay MODULE)
