@@ -6,14 +6,9 @@ set_target_properties(
              AUTOUIC ON
              AUTORCC ON
              FOLDER plugins
-             PREFIX ""
-             PROJECT_LABEL "Carla Bridge")
+             PREFIX "")
 
-set_target_properties(
-  carla-patchbay
-  PROPERTIES FOLDER plugins
-             PREFIX ""
-             PROJECT_LABEL "Carla Patchbay")
+set_target_properties(carla-patchbay PROPERTIES FOLDER plugins PREFIX "")
 
 if(_QT_VERSION EQUAL 6 AND OS_WINDOWS)
   set_target_properties(carla-bridge PROPERTIES AUTORCC_OPTIONS "--format-version;1")
