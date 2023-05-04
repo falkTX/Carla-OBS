@@ -38,4 +38,8 @@ target_include_directories(carla_water PUBLIC carla/source/includes carla/source
 
 target_link_libraries(carla_water PUBLIC ${CMAKE_THREAD_LIBS_INIT} ${carla_water_extra_libs})
 
-target_sources(carla_water PUBLIC ${carla_water_basedir}/water.cpp)
+if(OS_MACOS)
+  target_sources(carla_water PUBLIC ${carla_water_basedir}/water.mm)
+else()
+  target_sources(carla_water PUBLIC ${carla_water_basedir}/water.cpp)
+endif()
