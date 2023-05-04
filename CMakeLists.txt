@@ -1,21 +1,23 @@
 cmake_minimum_required(VERSION 3.16...3.25)
 
-find_qt(COMPONENTS Core Gui Widgets)
+legacy_check()
 
-find_package(PkgConfig)
+# find_qt(COMPONENTS Core Gui Widgets)
+
+# find_package(PkgConfig)
 
 # optional: finds correct plugin binary type
-if(NOT OS_WINDOWS)
-  pkg_check_modules(LIBMAGIC "libmagic")
-else()
-  set(LIBMAGIC_FOUND FALSE)
-endif()
+# if(NOT OS_WINDOWS)
+#   pkg_check_modules(LIBMAGIC "libmagic")
+# else()
+#   set(LIBMAGIC_FOUND FALSE)
+# endif()
 
-if(NOT (OS_MACOS OR OS_WINDOWS))
-  pkg_check_modules(X11 "x11")
-else()
-  set(X11_FOUND FALSE)
-endif()
+# if(NOT (OS_MACOS OR OS_WINDOWS))
+#   pkg_check_modules(X11 "x11")
+# else()
+#   set(X11_FOUND FALSE)
+# endif()
 
 # ######################################################################################################################
 
@@ -76,8 +78,11 @@ add_library(OBS::carla-patchbay ALIAS carla-patchbay)
 # target_link_libraries( carla-bridge PRIVATE # OBS::carla_jackbridge OBS::carla_lilv OBS::carla_water OBS::libobs
 # OBS::frontend-api Qt::Core Qt::Gui Qt::Widgets ${LIBMAGIC_LIBRARIES} )
 
-# target_link_libraries( carla-patchbay PRIVATE # OBS::carla_jackbridge OBS::carla_rtmempool OBS::carla_water
-# OBS::libobs OBS::frontend-api Qt::Core Qt::Gui Qt::Widgets ${LIBMAGIC_LIBRARIES} ${X11_LIBRARIES})
+target_link_libraries(carla-patchbay
+  PRIVATE # OBS::carla_jackbridge OBS::carla_rtmempool OBS::carla_water
+          OBS::libobs
+          # OBS::frontend-api Qt::Core Qt::Gui Qt::Widgets ${LIBMAGIC_LIBRARIES} ${X11_LIBRARIES}
+)
 
 # ######################################################################################################################
 
@@ -111,7 +116,7 @@ target_sources(carla-patchbay
 
 # set_target_properties_obs( carla-bridge PROPERTIES AUTOMOC ON AUTOUIC ON AUTORCC ON FOLDER plugins PREFIX "")
 
-# set_target_properties_obs(carla-patchbay PROPERTIES FOLDER plugins PREFIX "")
+set_target_properties_obs(carla-patchbay PROPERTIES FOLDER plugins PREFIX "")
 
 # set_property( TARGET carla-bridge APPEND PROPERTY AUTORCC_OPTIONS --format-version 1)
 
