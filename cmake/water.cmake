@@ -32,14 +32,16 @@ add_library(carla_water STATIC)
 
 set_property(TARGET carla_water PROPERTY POSITION_INDEPENDENT_CODE ON)
 
-target_compile_definitions(carla_water PUBLIC REAL_BUILD)
+target_compile_definitions(carla_water PRIVATE REAL_BUILD)
 
-target_include_directories(carla_water PUBLIC carla/source/includes carla/source/utils)
+target_compile_options(carla_water PRIVATE -Wno-deprecated-copy)
 
-target_link_libraries(carla_water PUBLIC ${CMAKE_THREAD_LIBS_INIT} ${carla_water_extra_libs})
+target_include_directories(carla_water PRIVATE carla/source/includes carla/source/utils)
+
+target_link_libraries(carla_water PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${carla_water_extra_libs})
 
 if(OS_MACOS)
-  target_sources(carla_water PUBLIC ${carla_water_basedir}/water.mm)
+  target_sources(carla_water PRIVATE ${carla_water_basedir}/water.mm)
 else()
-  target_sources(carla_water PUBLIC ${carla_water_basedir}/water.cpp)
+  target_sources(carla_water PRIVATE ${carla_water_basedir}/water.cpp)
 endif()
