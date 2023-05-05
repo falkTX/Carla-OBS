@@ -1,18 +1,22 @@
 # ######################################################################################################################
 # base config
 
-# find_package(Threads REQUIRED)
+find_package(Threads REQUIRED)
 
-# set(carla_jackbridge_basedir carla/source/jackbridge)
+set(carla_jackbridge_basedir carla/source/jackbridge)
 
-# if(NOT (OS_MACOS OR OS_WINDOWS)) set(carla_jackbridge_extra_libs "dl" "rt") endif()
+if(NOT (OS_MACOS OR OS_WINDOWS))
+  set(carla_jackbridge_extra_libs "dl" "rt")
+endif()
 
 # ######################################################################################################################
 # static lib
 
 add_library(carla-jackbridge STATIC)
 
-# if(NOT OS_WINDOWS) set_property(TARGET carla-jackbridge PROPERTY POSITION_INDEPENDENT_CODE ON) endif()
+if(NOT OS_WINDOWS)
+  set_property(TARGET carla-jackbridge PROPERTY POSITION_INDEPENDENT_CODE ON)
+endif()
 
 # target_compile_definitions(carla-jackbridge PRIVATE REAL_BUILD)
 
