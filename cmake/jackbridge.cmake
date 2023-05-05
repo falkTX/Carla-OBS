@@ -14,7 +14,9 @@ endif()
 
 add_library(carla_jackbridge STATIC)
 
-set_property(TARGET carla_jackbridge PROPERTY POSITION_INDEPENDENT_CODE ON)
+if(NOT OS_WINDOWS)
+  set_property(TARGET carla_jackbridge PROPERTY POSITION_INDEPENDENT_CODE ON)
+endif()
 
 target_compile_definitions(carla_jackbridge PRIVATE REAL_BUILD)
 

@@ -25,7 +25,9 @@ endif()
 
 add_library(carla_lilv_serd STATIC)
 
-set_property(TARGET carla_lilv_serd PROPERTY POSITION_INDEPENDENT_CODE ON)
+if(NOT OS_WINDOWS)
+  set_property(TARGET carla_lilv_serd PROPERTY POSITION_INDEPENDENT_CODE ON)
+endif()
 
 target_compile_options(carla_lilv_serd PRIVATE ${carla_lilv_compile_options})
 
@@ -38,7 +40,9 @@ target_sources(carla_lilv_serd PRIVATE ${carla_lilv_basedir}/serd.c)
 
 add_library(carla_lilv_sord STATIC)
 
-set_property(TARGET carla_lilv_sord PROPERTY POSITION_INDEPENDENT_CODE ON)
+if(NOT OS_WINDOWS)
+  set_property(TARGET carla_lilv_sord PROPERTY POSITION_INDEPENDENT_CODE ON)
+endif()
 
 target_compile_options(
   carla_lilv_sord
@@ -58,7 +62,9 @@ target_sources(carla_lilv_sord PRIVATE ${carla_lilv_basedir}/sord.c)
 
 add_library(carla_lilv_sratom STATIC)
 
-set_property(TARGET carla_lilv_sratom PROPERTY POSITION_INDEPENDENT_CODE ON)
+if(NOT OS_WINDOWS)
+  set_property(TARGET carla_lilv_sratom PROPERTY POSITION_INDEPENDENT_CODE ON)
+endif()
 
 target_compile_options(carla_lilv_sratom PRIVATE ${carla_lilv_compile_options})
 
@@ -74,7 +80,9 @@ target_sources(carla_lilv_sratom PRIVATE ${carla_lilv_basedir}/sratom.c)
 
 add_library(carla_lilv_lilv STATIC)
 
-set_property(TARGET carla_lilv_lilv PROPERTY POSITION_INDEPENDENT_CODE ON)
+if(NOT OS_WINDOWS)
+  set_property(TARGET carla_lilv_lilv PROPERTY POSITION_INDEPENDENT_CODE ON)
+endif()
 
 target_compile_options(carla_lilv_lilv PRIVATE ${carla_lilv_compile_options})
 

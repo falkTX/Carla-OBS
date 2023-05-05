@@ -30,7 +30,9 @@ endif()
 
 add_library(carla_water STATIC)
 
-set_property(TARGET carla_water PROPERTY POSITION_INDEPENDENT_CODE ON)
+if(NOT OS_WINDOWS)
+  set_property(TARGET carla_water PROPERTY POSITION_INDEPENDENT_CODE ON)
+endif()
 
 target_compile_definitions(carla_water PRIVATE REAL_BUILD)
 
