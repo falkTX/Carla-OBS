@@ -51,8 +51,7 @@ add_library(OBS::carla-bridge ALIAS carla-bridge)
 target_link_libraries(
   carla-bridge
   PRIVATE carla::rtmempool
-          # OBS::carla_lilv
-          # OBS::carla_water
+          # OBS::carla_lilv OBS::carla_water
           OBS::libobs # OBS::frontend-api Qt::Core Qt::Gui Qt::Widgets ${LIBMAGIC_LIBRARIES}
 )
 
