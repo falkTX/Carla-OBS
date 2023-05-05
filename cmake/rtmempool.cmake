@@ -1,11 +1,11 @@
 # ######################################################################################################################
 # base config
 
-find_package(Threads REQUIRED)
-
 set(carla_rtmempool_basedir carla/source/modules/rtmempool)
 
-if(NOT (OS_MACOS OR OS_WINDOWS))
+if(OS_WINDOWS)
+  set(carla_rtmempool_extra_libs OBS::w32-pthreads)
+elseif(NOT (OS_FREEBSD or OS_MACOS))
   set(carla_rtmempool_extra_libs "rt")
 endif()
 

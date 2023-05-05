@@ -1,8 +1,6 @@
 # ######################################################################################################################
 # base config
 
-# find_package(Threads REQUIRED)
-
 # set(carla_water_basedir carla/source/modules/water)
 
 # if(OS_MACOS) set(carla_water_extra_libs "-framework AppKit") elseif(OS_WINDOWS) set(carla_water_extra_libs "uuid"
