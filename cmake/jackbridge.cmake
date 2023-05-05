@@ -18,9 +18,9 @@ if(NOT OS_WINDOWS)
   set_property(TARGET carla-jackbridge PROPERTY POSITION_INDEPENDENT_CODE ON)
 endif()
 
-# target_compile_definitions(carla-jackbridge PRIVATE REAL_BUILD)
+target_compile_definitions(carla-jackbridge PRIVATE REAL_BUILD)
 
-# target_include_directories(carla-jackbridge PRIVATE carla/source/includes carla/source/utils)
+target_include_directories(carla-jackbridge PRIVATE carla/source/includes carla/source/utils)
 
 # target_link_libraries(carla-jackbridge PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${carla_jackbridge_extra_libs})
 
