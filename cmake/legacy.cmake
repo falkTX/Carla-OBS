@@ -31,18 +31,14 @@ else()
   set(X11_FOUND FALSE)
 endif()
 
-# Import extra carla libs
-include(cmake/jackbridge.cmake)
-add_library(OBS::carla_jackbridge ALIAS carla_jackbridge)
+# Import extra carla libs include(cmake/jackbridge.cmake) add_library(OBS::carla_jackbridge ALIAS carla_jackbridge)
 
-include(cmake/lilv.cmake)
-add_library(OBS::carla_lilv ALIAS carla_lilv)
+# include(cmake/lilv.cmake) add_library(OBS::carla_lilv ALIAS carla_lilv)
 
 include(cmake/rtmempool.cmake)
 add_library(carla::rtmempool ALIAS carla_rtmempool)
 
-include(cmake/water.cmake)
-add_library(OBS::carla_water ALIAS carla_water)
+# include(cmake/water.cmake) add_library(OBS::carla_water ALIAS carla_water)
 
 # Setup carla-bridge target
 add_library(carla-bridge MODULE)
