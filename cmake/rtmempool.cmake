@@ -14,9 +14,7 @@ endif()
 
 add_library(carla-rtmempool STATIC)
 
-# if(NOT OS_WINDOWS)
-# set_property(TARGET carla-rtmempool PROPERTY POSITION_INDEPENDENT_CODE ON)
-# endif()
+# if(NOT OS_WINDOWS) set_property(TARGET carla-rtmempool PROPERTY POSITION_INDEPENDENT_CODE ON) endif()
 
 # target_compile_definitions(carla-rtmempool PRIVATE REAL_BUILD)
 

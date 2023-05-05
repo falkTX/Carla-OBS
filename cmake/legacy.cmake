@@ -35,12 +35,14 @@ endif()
 include(cmake/jackbridge.cmake)
 add_library(carla::jackbridge ALIAS carla-jackbridge)
 
-# include(cmake/lilv.cmake) add_library(carla::carla_lilv ALIAS carla_lilv)
+include(cmake/lilv.cmake)
+add_library(carla::lilv ALIAS carla-lilv)
 
 include(cmake/rtmempool.cmake)
 add_library(carla::rtmempool ALIAS carla-rtmempool)
 
-# include(cmake/water.cmake) add_library(carla::carla_water ALIAS carla_water)
+include(cmake/water.cmake)
+add_library(carla::water ALIAS carla-water)
 
 # Setup carla-bridge target
 add_library(carla-bridge MODULE)
