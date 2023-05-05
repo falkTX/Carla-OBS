@@ -12,7 +12,7 @@ endif()
 # ######################################################################################################################
 # static lib
 
-add_library(carla_rtmempool INTERFACE)
+add_library(carla_rtmempool STATIC)
 
 if(NOT OS_WINDOWS)
   set_property(TARGET carla_rtmempool PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -23,7 +23,7 @@ endif()
 # target_include_directories(carla_rtmempool PRIVATE carla/source/includes carla/source/utils)
 
 # target_link_libraries(carla_rtmempool PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${carla_rtmempool_extra_libs})
-target_link_libraries(carla_rtmempool INTERFACE OBS::libobs)
+target_link_libraries(carla_rtmempool PRIVATE OBS::libobs)
 
 target_sources(carla_rtmempool PRIVATE common.c)
 
