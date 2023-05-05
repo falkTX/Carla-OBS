@@ -5,9 +5,7 @@
 
 # set(carla_jackbridge_basedir carla/source/jackbridge)
 
-# if(NOT (OS_MACOS OR OS_WINDOWS))
-# set(carla_jackbridge_extra_libs "dl" "rt")
-# endif()
+# if(NOT (OS_MACOS OR OS_WINDOWS)) set(carla_jackbridge_extra_libs "dl" "rt") endif()
 
 # ######################################################################################################################
 # static lib
