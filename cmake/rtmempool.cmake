@@ -1,18 +1,22 @@
 # ######################################################################################################################
 # base config
 
-# find_package(Threads REQUIRED)
+find_package(Threads REQUIRED)
 
-# set(carla_rtmempool_basedir carla/source/modules/rtmempool)
+set(carla_rtmempool_basedir carla/source/modules/rtmempool)
 
-# if(NOT (OS_MACOS OR OS_WINDOWS)) set(carla_rtmempool_extra_libs "rt") endif()
+if(NOT (OS_MACOS OR OS_WINDOWS))
+  set(carla_rtmempool_extra_libs "rt")
+endif()
 
 # ######################################################################################################################
 # static lib
 
 add_library(carla_rtmempool INTERFACE)
 
-# if(NOT OS_WINDOWS) set_property(TARGET carla_rtmempool PROPERTY POSITION_INDEPENDENT_CODE ON) endif()
+if(NOT OS_WINDOWS)
+  set_property(TARGET carla_rtmempool PROPERTY POSITION_INDEPENDENT_CODE ON)
+endif()
 
 # target_compile_definitions(carla_rtmempool PRIVATE REAL_BUILD)
 
