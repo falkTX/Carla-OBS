@@ -30,7 +30,8 @@ endif()
 
 # Import extra carla libs include(cmake/jackbridge.cmake) add_library(OBS::carla_jackbridge ALIAS carla_jackbridge)
 
-# include(cmake/lilv.cmake) add_library(OBS::carla_lilv ALIAS carla_lilv)
+include(cmake/lilv.cmake)
+add_library(OBS::carla_lilv ALIAS carla_lilv)
 
 # include(cmake/rtmempool.cmake) add_library(OBS::carla_rtmempool ALIAS carla_rtmempool)
 
@@ -41,8 +42,11 @@ add_library(carla-bridge MODULE)
 add_library(OBS::carla-bridge ALIAS carla-bridge)
 
 target_link_libraries(
-  carla-bridge PRIVATE # OBS::carla_jackbridge OBS::carla_lilv OBS::carla_water
-                       OBS::libobs # OBS::frontend-api Qt::Core Qt::Gui Qt::Widgets ${LIBMAGIC_LIBRARIES}
+  carla-bridge
+  PRIVATE # OBS::carla_jackbridge
+          OBS::carla_lilv
+          # OBS::carla_water
+          OBS::libobs # OBS::frontend-api Qt::Core Qt::Gui Qt::Widgets ${LIBMAGIC_LIBRARIES}
 )
 
 target_sources(
