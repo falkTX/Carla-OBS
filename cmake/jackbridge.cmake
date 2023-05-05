@@ -14,9 +14,7 @@
 
 add_library(carla-jackbridge STATIC)
 
-# if(NOT OS_WINDOWS)
-# set_property(TARGET carla-jackbridge PROPERTY POSITION_INDEPENDENT_CODE ON)
-# endif()
+# if(NOT OS_WINDOWS) set_property(TARGET carla-jackbridge PROPERTY POSITION_INDEPENDENT_CODE ON) endif()
 
 # target_compile_definitions(carla-jackbridge PRIVATE REAL_BUILD)
 

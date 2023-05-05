@@ -34,8 +34,7 @@ add_library(carla::jackbridge ALIAS carla-jackbridge)
 
 # include(cmake/lilv.cmake) add_library(carla::carla_lilv ALIAS carla_lilv)
 
-include(cmake/rtmempool.cmake)
-add_library(carla::rtmempool ALIAS carla-rtmempool)
+# include(cmake/rtmempool.cmake) add_library(carla::rtmempool ALIAS carla-rtmempool)
 
 # include(cmake/water.cmake) add_library(carla::carla_water ALIAS carla_water)
 
