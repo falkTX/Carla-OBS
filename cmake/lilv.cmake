@@ -1,7 +1,9 @@
 # ######################################################################################################################
 # base config
 
-if(NOT MSVC)
+if(MSVC)
+  set(carla_lilv_compile_options /wd4244 /wd4267)
+else()
   set(carla_lilv_compile_options
       -Wno-error
       -Wno-deprecated-declarations
