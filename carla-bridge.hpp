@@ -11,6 +11,8 @@
 
 // #include "water/threads/ChildProcess.h"
 
+#include <vector>
+
 CARLA_BACKEND_USE_NAMESPACE
 
 // --------------------------------------------------------------------------------------------------------------------
