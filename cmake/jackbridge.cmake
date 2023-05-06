@@ -1,6 +1,4 @@
-# ######################################################################################################################
 # base config
-
 set(carla_jackbridge_basedir carla/source/jackbridge)
 
 if(OS_WINDOWS)
@@ -17,9 +15,7 @@ if(NOT
   set(carla_jackbridge_extra_libs ${carla_jackbridge_extra_libs} dl rt)
 endif()
 
-# ######################################################################################################################
 # static lib
-
 add_library(carla-jackbridge STATIC)
 mark_as_advanced(carla-jackbridge)
 

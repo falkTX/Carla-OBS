@@ -1,8 +1,6 @@
-# ######################################################################################################################
 # base config
-
 if(MSVC)
-  set(carla_lilv_compile_options /wd4244 /wd4267)
+  set(carla_lilv_compile_options /wd4005 /wd4244 /wd4267)
 else()
   set(carla_lilv_compile_options
       -Wno-error
@@ -24,9 +22,7 @@ else()
   set(carla_lilv_extra_libs dl m rt)
 endif()
 
-# ######################################################################################################################
 # serd
-
 add_library(carla-lilv_serd STATIC)
 
 if(NOT OS_WINDOWS)
@@ -39,9 +35,7 @@ target_include_directories(carla-lilv_serd PRIVATE ${carla_lilv_include_director
 
 target_sources(carla-lilv_serd PRIVATE ${carla_lilv_basedir}/serd.c)
 
-# ######################################################################################################################
 # sord
-
 add_library(carla-lilv_sord STATIC)
 
 if(NOT OS_WINDOWS)
@@ -61,9 +55,7 @@ target_link_libraries(carla-lilv_sord PRIVATE carla-lilv_serd)
 
 target_sources(carla-lilv_sord PRIVATE ${carla_lilv_basedir}/sord.c)
 
-# ######################################################################################################################
 # sratom
-
 add_library(carla-lilv_sratom STATIC)
 
 if(NOT OS_WINDOWS)
@@ -79,9 +71,7 @@ target_link_libraries(carla-lilv_sratom PRIVATE carla-lilv_serd)
 
 target_sources(carla-lilv_sratom PRIVATE ${carla_lilv_basedir}/sratom.c)
 
-# ######################################################################################################################
 # lilv
-
 add_library(carla-lilv_lilv STATIC)
 
 if(NOT OS_WINDOWS)
@@ -97,9 +87,7 @@ target_link_libraries(carla-lilv_lilv PRIVATE carla-lilv_serd carla-lilv_sord ca
 
 target_sources(carla-lilv_lilv PRIVATE ${carla_lilv_basedir}/lilv.c)
 
-# ######################################################################################################################
 # combined target
-
 add_library(carla-lilv INTERFACE)
 mark_as_advanced(carla-lilv)
 

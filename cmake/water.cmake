@@ -1,6 +1,4 @@
-# ######################################################################################################################
 # base config
-
 set(carla_water_basedir carla/source/modules/water)
 
 if(OS_WINDOWS)
@@ -31,9 +29,7 @@ else()
   set(carla_water_extra_libs ${carla_jackbridge_extra_libs} dl rt)
 endif()
 
-# ######################################################################################################################
 # static lib
-
 add_library(carla-water STATIC)
 mark_as_advanced(carla-water)
 

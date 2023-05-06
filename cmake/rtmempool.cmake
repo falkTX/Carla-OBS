@@ -1,6 +1,4 @@
-# ######################################################################################################################
 # base config
-
 set(carla_rtmempool_basedir carla/source/modules/rtmempool)
 
 if(OS_WINDOWS)
@@ -10,9 +8,7 @@ else()
   set(carla_rtmempool_extra_libs ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
-# ######################################################################################################################
 # static lib
-
 add_library(carla-rtmempool STATIC)
 mark_as_advanced(carla-rtmempool)
 
