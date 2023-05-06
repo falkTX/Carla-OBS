@@ -19,6 +19,35 @@
 
 #include <ctime>
 
+struct BridgeTextReader {
+	char* text = nullptr;
+
+	BridgeTextReader(BridgeNonRtServerControl& nonRtServerCtrl)
+	{
+		const uint32_t size = nonRtServerCtrl.readUInt();
+		CARLA_SAFE_ASSERT_RETURN(size != 0,);
+
+		text = new char[size + 1];
+		nonRtServerCtrl.readCustomData(text, size);
+		text[size] = '\0';
+	}
+
+	BridgeTextReader(BridgeNonRtServerControl& nonRtServerCtrl, const uint32_t size)
+	{
+		text = new char[size + 1];
+
+		if (size != 0)
+			nonRtServerCtrl.readCustomData(text, size);
+
+		text[size] = '\0';
+	}
+
+	~BridgeTextReader() noexcept
+	{
+		delete[] text;
+	}
+};
+
 // ----------------------------------------------------------------------------
 
 /* TODO
@@ -548,32 +577,20 @@ void carla_bridge::readMessages()
 		// uint/size, str[] (realName), uint/size, str[] (label), uint/size, str[] (maker), uint/size, str[] (copyright)
 		case kPluginBridgeNonRtServerPluginInfo2: {
 			// realName
-			const uint32_t realNameSize(
-				nonRtServerCtrl.readUInt());
-			char realName[realNameSize + 1];
-			nonRtServerCtrl.readCustomData(realName,
-							realNameSize);
+			if (const uint32_t size = nonRtServerCtrl.readUInt())
+				nonRtServerCtrl.skipRead(size);
 
 			// label
-			const uint32_t labelSize(
-				nonRtServerCtrl.readUInt());
-			char label[labelSize + 1];
-			nonRtServerCtrl.readCustomData(label,
-							labelSize);
+			if (const uint32_t size = nonRtServerCtrl.readUInt())
+				nonRtServerCtrl.skipRead(size);
 
 			// maker
-			const uint32_t makerSize(
-				nonRtServerCtrl.readUInt());
-			char maker[makerSize + 1];
-			nonRtServerCtrl.readCustomData(maker,
-							makerSize);
+			if (const uint32_t size = nonRtServerCtrl.readUInt())
+				nonRtServerCtrl.skipRead(size);
 
 			// copyright
-			const uint32_t copyrightSize(
-				nonRtServerCtrl.readUInt());
-			char copyright[copyrightSize + 1];
-			nonRtServerCtrl.readCustomData(copyright,
-							copyrightSize);
+			if (const uint32_t size = nonRtServerCtrl.readUInt())
+				nonRtServerCtrl.skipRead(size);
 		} break;
 
 		// uint/ins, uint/outs
@@ -623,10 +640,8 @@ void carla_bridge::readMessages()
 			nonRtServerCtrl.readUInt();
 
 			// name
-			const uint32_t nameSize(
-				nonRtServerCtrl.readUInt());
-			char name[nameSize + 1];
-			nonRtServerCtrl.readCustomData(name, nameSize);
+			if (const uint32_t size = nonRtServerCtrl.readUInt())
+				nonRtServerCtrl.skipRead(size);
 
 		} break;
 
@@ -667,35 +682,22 @@ void carla_bridge::readMessages()
 				nonRtServerCtrl.readUInt();
 
 			// name
-			const uint32_t nameSize(
-				nonRtServerCtrl.readUInt());
-			char name[nameSize + 1];
-			carla_zeroChars(name, nameSize + 1);
-			nonRtServerCtrl.readCustomData(name, nameSize);
+			const BridgeTextReader name(nonRtServerCtrl);
 
 			// symbol
-			const uint32_t symbolSize(
-				nonRtServerCtrl.readUInt());
-			char symbol[symbolSize + 1];
-			carla_zeroChars(symbol, symbolSize + 1);
-			nonRtServerCtrl.readCustomData(symbol,
-							symbolSize);
+			const BridgeTextReader symbol(nonRtServerCtrl);
 
 			// unit
-			const uint32_t unitSize(
-				nonRtServerCtrl.readUInt());
-			char unit[unitSize + 1];
-			carla_zeroChars(unit, unitSize + 1);
-			nonRtServerCtrl.readCustomData(unit, unitSize);
+			const BridgeTextReader unit(nonRtServerCtrl);
 
 			CARLA_SAFE_ASSERT_UINT2_BREAK(
 				index < paramCount, index, paramCount);
 
 			if (paramDetails[index].hints &
 				PARAMETER_IS_ENABLED) {
-				paramDetails[index].name = name;
-				paramDetails[index].symbol = symbol;
-				paramDetails[index].unit = unit;
+				paramDetails[index].name = name.text;
+				paramDetails[index].symbol = symbol.text;
+				paramDetails[index].unit = unit.text;
 			}
 		} break;
 
@@ -808,10 +810,8 @@ void carla_bridge::readMessages()
 			nonRtServerCtrl.readUInt();
 
 			// name
-			const uint32_t nameSize(
-				nonRtServerCtrl.readUInt());
-			char name[nameSize + 1];
-			nonRtServerCtrl.readCustomData(name, nameSize);
+			if (const uint32_t size = nonRtServerCtrl.readUInt())
+				nonRtServerCtrl.skipRead(size);
 		} break;
 
 		// uint/index, uint/bank, uint/program, uint/size, str[] (name)
@@ -821,27 +821,17 @@ void carla_bridge::readMessages()
 			nonRtServerCtrl.readUInt();
 
 			// name
-			const uint32_t nameSize(
-				nonRtServerCtrl.readUInt());
-			char name[nameSize + 1];
-			nonRtServerCtrl.readCustomData(name, nameSize);
+			if (const uint32_t size = nonRtServerCtrl.readUInt())
+				nonRtServerCtrl.skipRead(size);
 		} break;
 
 		// uint/size, str[], uint/size, str[], uint/size, str[]
 		case kPluginBridgeNonRtServerSetCustomData: {
 			// type
-			const uint32_t typeSize =
-				nonRtServerCtrl.readUInt();
-			char type[typeSize + 1];
-			carla_zeroChars(type, typeSize + 1);
-			nonRtServerCtrl.readCustomData(type, typeSize);
+			const BridgeTextReader type(nonRtServerCtrl);
 
 			// key
-			const uint32_t keySize =
-				nonRtServerCtrl.readUInt();
-			char key[keySize + 1];
-			carla_zeroChars(key, keySize + 1);
-			nonRtServerCtrl.readCustomData(key, keySize);
+			const BridgeTextReader key(nonRtServerCtrl);
 
 			// value
 			const uint32_t valueSize =
@@ -850,10 +840,7 @@ void carla_bridge::readMessages()
 			// special case for big values
 			if (valueSize > 16384)
 			{
-				const uint32_t bigValueFilePathSize = nonRtServerCtrl.readUInt();
-				char bigValueFilePath[bigValueFilePathSize+1];
-				carla_zeroChars(bigValueFilePath, bigValueFilePathSize+1);
-				nonRtServerCtrl.readCustomData(bigValueFilePath, bigValueFilePathSize);
+				const BridgeTextReader bigValueFilePath(nonRtServerCtrl, valueSize);
 
 // 				String realBigValueFilePath(bigValueFilePath);
 
@@ -883,12 +870,7 @@ void carla_bridge::readMessages()
 			}
 			else
 			{
-				char value[valueSize + 1];
-				carla_zeroChars(value, valueSize + 1);
-
-				if (valueSize > 0)
-					nonRtServerCtrl.readCustomData(
-						value, valueSize);
+				const BridgeTextReader value(nonRtServerCtrl, valueSize);
 
 // 				CarlaPlugin::setCustomData(type, key, value, false);
 			}
@@ -898,13 +880,7 @@ void carla_bridge::readMessages()
 		// uint/size, str[] (filename, base64 content)
 		case kPluginBridgeNonRtServerSetChunkDataFile: {
 			// chunkFilePath
-			const uint32_t chunkFilePathSize =
-				nonRtServerCtrl.readUInt();
-			char chunkFilePath[chunkFilePathSize + 1];
-			carla_zeroChars(chunkFilePath,
-					chunkFilePathSize + 1);
-			nonRtServerCtrl.readCustomData(
-				chunkFilePath, chunkFilePathSize);
+			const BridgeTextReader chunkFilePath(nonRtServerCtrl);
 
 			/* TODO
 			water::String realChunkFilePath(chunkFilePath);
@@ -945,15 +921,12 @@ void carla_bridge::readMessages()
 			break;
 
 		case kPluginBridgeNonRtServerSetParameterText: {
-			const int32_t index = nonRtServerCtrl.readInt();
+			nonRtServerCtrl.readInt();
 
-			const uint32_t textSize(
-				nonRtServerCtrl.readUInt());
-			char text[textSize + 1];
-			carla_zeroChars(text, textSize + 1);
-			nonRtServerCtrl.readCustomData(text, textSize);
+			if (const uint32_t size = nonRtServerCtrl.readUInt())
+				nonRtServerCtrl.skipRead(size);
 
-			//                 fReceivingParamText.setReceivedData(index, text, textSize);
+			// fReceivingParamText.setReceivedData(index, text, textSize);
 		} break;
 
 		case kPluginBridgeNonRtServerReady:
@@ -985,12 +958,7 @@ void carla_bridge::readMessages()
 
 		// uint/size, str[]
 		case kPluginBridgeNonRtServerError: {
-			const uint32_t errorSize(
-				nonRtServerCtrl.readUInt());
-			char error[errorSize + 1];
-			carla_zeroChars(error, errorSize + 1);
-			nonRtServerCtrl.readCustomData(error,
-							errorSize);
+			const BridgeTextReader error(nonRtServerCtrl);
 
 			//                 if (fInitiated)
 			//                 {
