@@ -5,7 +5,7 @@ set(carla_jackbridge_basedir carla/source/jackbridge)
 
 if(OS_WINDOWS)
   set(carla_jackbridge_extra_libs OBS::w32-pthreads)
-elseif(NOT (OS_FREEBSD or OS_MACOS))
+elseif(NOT (OS_FREEBSD OR OS_MACOS))
   set(carla_jackbridge_extra_libs "dl" "rt")
 endif()
 

@@ -5,7 +5,7 @@ set(carla_rtmempool_basedir carla/source/modules/rtmempool)
 
 if(OS_WINDOWS)
   set(carla_rtmempool_extra_libs OBS::w32-pthreads)
-elseif(NOT (OS_FREEBSD or OS_MACOS))
+elseif(NOT (OS_FREEBSD OR OS_MACOS))
   set(carla_rtmempool_extra_libs "rt")
 endif()
 
