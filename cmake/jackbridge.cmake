@@ -4,7 +4,7 @@
 set(carla_jackbridge_basedir carla/source/jackbridge)
 
 if(OS_WINDOWS)
-  set(carla_jackbridge_extra_libs OBS::w32-pthreads)
+  set(carla_jackbridge_extra_libs OBS::w32-pthreads kernel32)
 elseif(NOT (OS_FREEBSD OR OS_MACOS))
   set(carla_jackbridge_extra_libs "dl" "rt")
 endif()
@@ -27,6 +27,6 @@ target_link_libraries(carla-jackbridge PRIVATE OBS::libobs ${carla_jackbridge_ex
 # target_sources(carla-jackbridge PRIVATE ${carla_jackbridge_basedir}/JackBridge1.cpp
 # ${carla_jackbridge_basedir}/JackBridge2.cpp)
 
-target_sources(carla-jackbridge PRIVATE common.c ${carla_jackbridge_basedir}/JackBridge2.cpp)
+target_sources(carla-jackbridge PRIVATE common.c ${carla_jackbridge_basedir}/JackBridge1.cpp)
 
 mark_as_advanced(carla-jackbridge)
