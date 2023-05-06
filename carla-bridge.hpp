@@ -9,9 +9,10 @@
 #include "CarlaBackend.h"
 #include "CarlaBridgeUtils.hpp"
 
-// #include "water/threads/ChildProcess.h"
-
+#include <memory>
 #include <vector>
+
+#include <QtCore/QProcess>
 
 CARLA_BACKEND_USE_NAMESPACE
 
@@ -108,7 +109,7 @@ private:
 	BridgeNonRtClientControl nonRtClientCtrl; // fShmNonRtClientControl
 	BridgeNonRtServerControl nonRtServerCtrl; // fShmNonRtServerControl
 
-	// CarlaScopedPointer<water::ChildProcess> childprocess;
+	std::unique_ptr<QProcess> childprocess;
 
 	void readMessages();
 };

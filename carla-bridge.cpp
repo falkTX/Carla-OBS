@@ -52,38 +52,6 @@ struct BridgeTextReader {
 
 // ----------------------------------------------------------------------------
 
-/* TODO
-static void stopProcess(water::ChildProcess *const process)
-{
-	// we only get here if bridge crashed or thread asked to exit
-	if (process->isRunning()) {
-		process->waitForProcessToFinish(2000);
-
-		if (process->isRunning()) {
-			carla_stdout(
-				"CarlaPluginBridgeThread::run() - bridge refused to close, force kill now");
-			process->kill();
-		} else {
-			carla_stdout(
-				"CarlaPluginBridgeThread::run() - bridge auto-closed successfully");
-		}
-	} else {
-		// forced quit, may have crashed
-		if (process->getExitCodeAndClearPID() != 0) {
-			carla_stderr(
-				"CarlaPluginBridgeThread::run() - bridge crashed");
-
-			CarlaString errorString(
-				"Plugin has crashed!\n"
-				"Saving now will lose its current settings.\n"
-				"Please remove this plugin, and not rely on it from this point.");
-		}
-	}
-}
-*/
-
-// ----------------------------------------------------------------------------
-
 bool carla_bridge::init(uint32_t maxBufferSize, double sampleRate)
 {
 	std::srand(static_cast<uint>(std::time(nullptr)));
@@ -178,9 +146,8 @@ void carla_bridge::cleanup()
 {
 	ready = false;
 
-	/* TODO
 	if (childprocess != nullptr) {
-		if (childprocess->isRunning()) {
+		if (childprocess->state() != QProcess::NotRunning) {
 			nonRtClientCtrl.writeOpcode(
 				kPluginBridgeNonRtClientQuit);
 			nonRtClientCtrl.commitWrite();
@@ -190,12 +157,34 @@ void carla_bridge::cleanup()
 
 			if (!timedOut)
 				wait("stopping", 3000);
+
+			childprocess->terminate();
+			childprocess->waitForFinished(2000);
+
+			if (childprocess->state() != QProcess::NotRunning) {
+				carla_stdout(
+					"CarlaPluginBridgeThread::run() - bridge refused to close, force kill now");
+				childprocess->kill();
+			} else {
+				carla_stdout(
+					"CarlaPluginBridgeThread::run() - bridge auto-closed successfully");
+			}
+		}
+		else {
+			// forced quit, may have crashed
+			if (childprocess->exitStatus() == QProcess::CrashExit) {
+				carla_stderr(
+					"CarlaPluginBridgeThread::run() - bridge crashed");
+
+				CarlaString errorString(
+					"Plugin has crashed!\n"
+					"Saving now will lose its current settings.\n"
+					"Please remove this plugin, and not rely on it from this point.");
+			}
 		}
 
-		stopProcess(childprocess);
 		childprocess = nullptr;
 	}
-	*/
 
 	nonRtServerCtrl.clear();
 	nonRtClientCtrl.clear();
@@ -211,10 +200,9 @@ bool carla_bridge::start(const PluginType type,
 {
 	UNUSED_PARAMETER(binaryArchName);
 
-	/* TODO
 	if (childprocess == nullptr) {
-		childprocess = new water::ChildProcess();
-	} else if (childprocess->isRunning()) {
+		childprocess = std::make_unique<QProcess>();
+	} else if (childprocess->state() != QProcess::NotRunning) {
 		carla_stderr(
 			"CarlaPluginBridgeThread::run() - already running");
 	}
@@ -222,6 +210,7 @@ bool carla_bridge::start(const PluginType type,
 	char strBuf[STR_MAX + 1];
 	strBuf[STR_MAX] = '\0';
 
+	/* TODO
 	// setup binary arch
 	water::ChildProcess::Type childType;
 #ifdef CARLA_OS_MAC
@@ -232,6 +221,7 @@ bool carla_bridge::start(const PluginType type,
 	else
 #endif
 		childType = water::ChildProcess::TypeAny;
+	*/
 
 	// do not use null strings for label and filename
 	if (label == nullptr || label[0] == '\0')
@@ -239,23 +229,22 @@ bool carla_bridge::start(const PluginType type,
 	if (filename == nullptr || filename[0] == '\0')
 		filename = "(none)";
 
-	water::StringArray arguments;
+	QStringList arguments;
 
 	// bridge binary
-	arguments.add(bridgeBinary);
+	// arguments.append(bridgeBinary);
 
 	// plugin type
-	arguments.add(getPluginTypeAsString(type));
+	arguments.append(QString::fromUtf8(getPluginTypeAsString(type)));
 
 	// filename
-	arguments.add(filename);
+	arguments.append(QString::fromUtf8(filename));
 
 	// label
-	arguments.add(label);
+	arguments.append(QString::fromUtf8(label));
 
 	// uniqueId
-	arguments.add(water::String(static_cast<water::int64>(uniqueId)));
-	*/
+	arguments.append(QString::number(uniqueId));
 
 	bool started;
 
@@ -268,16 +257,12 @@ bool carla_bridge::start(const PluginType type,
 			label, uniqueId);
 
 		started = false;
-		/* TODO
-		childprocess->start(arguments, childType);
-		*/
+		childprocess->start(bridgeBinary, arguments);
 	}
 
 	if (!started) {
 		carla_stdout("failed!");
-		/* TODO
 		childprocess = nullptr;
-		*/
 		return false;
 	}
 
@@ -301,10 +286,7 @@ bool carla_bridge::start(const PluginType type,
 
 bool carla_bridge::isRunning() const
 {
-	return false;
-	/* TODO
-	return childprocess != nullptr && childprocess->isRunning();
-	*/
+	return childprocess != nullptr && childprocess->state() != QProcess::NotRunning;
 }
 
 bool carla_bridge::isReady() const noexcept
@@ -314,11 +296,10 @@ bool carla_bridge::isReady() const noexcept
 
 bool carla_bridge::idle()
 {
-	/* TODO
 	if (childprocess == nullptr)
 		return false;
 
-	if (childprocess->isRunning()) {
+	if (childprocess->state() != QProcess::NotRunning) {
 		const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
 
 		nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientPing);
@@ -331,7 +312,6 @@ bool carla_bridge::idle()
 		cleanup();
 		return false;
 	}
-	*/
 
 	//         if (priv->loaded && fTimedOut && pData->active)
 	//             setActive(false, true, true);
