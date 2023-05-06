@@ -27,8 +27,6 @@ target_link_libraries(carla-jackbridge PRIVATE OBS::libobs ${carla_jackbridge_ex
 # target_sources(carla-jackbridge PRIVATE ${carla_jackbridge_basedir}/JackBridge1.cpp
 # ${carla_jackbridge_basedir}/JackBridge2.cpp)
 
-# target_link_libraries(carla-jackbridge PRIVATE OBS::libobs)
-
-target_sources(carla-jackbridge PRIVATE common.c)
+target_sources(carla-jackbridge PRIVATE common.c ${carla_jackbridge_basedir}/JackBridge2.cpp)
 
 mark_as_advanced(carla-jackbridge)
