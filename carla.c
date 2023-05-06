@@ -19,7 +19,7 @@
 #include <util/platform.h>
 
 // for audio generator thread
-#include <threads.h>
+#include <pthread.h>
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -36,7 +36,7 @@ struct carla_data {
 	// audio generator thread
 	bool audiogen_enabled;
 	volatile bool audiogen_running;
-	thrd_t audiogen_thread;
+	pthread_t audiogen_thread;
 
 	// internal buffering
 	float *buffers[MAX_AV_PLANES];
@@ -51,7 +51,7 @@ struct carla_data {
 // --------------------------------------------------------------------------------------------------------------------
 // private methods
 
-static int carla_obs_audio_gen_thread(void *data)
+static void* carla_obs_audio_gen_thread(void *data)
 {
 	struct carla_data *carla = data;
 
@@ -87,7 +87,7 @@ static int carla_obs_audio_gen_thread(void *data)
 		os_sleepto_ns_fast(out.timestamp);
 	}
 
-	return thrd_success;
+	return NULL;
 }
 
 static void carla_obs_idle_callback(void *data, float unused)
@@ -220,8 +220,8 @@ static void carla_obs_activate(void *data)
 	if (carla->audiogen_enabled) {
 		assert(!carla->audiogen_running);
 		carla->audiogen_running = true;
-		thrd_create(&carla->audiogen_thread, carla_obs_audio_gen_thread,
-			    carla);
+		pthread_create(&carla->audiogen_thread, NULL, carla_obs_audio_gen_thread,
+			       carla);
 	}
 }
 
@@ -233,7 +233,7 @@ static void carla_obs_deactivate(void *data)
 
 	if (carla->audiogen_running) {
 		carla->audiogen_running = false;
-		thrd_join(carla->audiogen_thread, NULL);
+		pthread_join(carla->audiogen_thread, NULL);
 	}
 
 	carla_priv_deactivate(carla->priv);
