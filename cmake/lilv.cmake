@@ -77,6 +77,7 @@
 # combined target
 
 add_library(carla-lilv INTERFACE)
+mark_as_advanced(carla-lilv)
 
 # target_link_libraries(carla_lilv INTERFACE carla_lilv_serd carla_lilv_sord carla_lilv_sratom carla_lilv_lilv
 # ${carla_lilv_extra_libs})
@@ -84,5 +85,3 @@ add_library(carla-lilv INTERFACE)
 target_link_libraries(carla-lilv INTERFACE OBS::libobs)
 
 target_sources(carla-lilv PRIVATE common.c)
-
-mark_as_advanced(carla-lilv)

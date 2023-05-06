@@ -11,10 +11,11 @@
 # static lib
 
 add_library(carla-water STATIC)
+mark_as_advanced(carla-water)
 
-# if(NOT OS_WINDOWS) set_property(TARGET carla-water PROPERTY POSITION_INDEPENDENT_CODE ON) endif()
-
-# target_compile_definitions(carla-water PRIVATE REAL_BUILD)
+if(NOT OS_WINDOWS)
+  set_property(TARGET carla-water PROPERTY POSITION_INDEPENDENT_CODE ON)
+endif()
 
 # target_compile_options(carla-water PRIVATE -Wno-deprecated-copy)
 
@@ -28,5 +29,3 @@ add_library(carla-water STATIC)
 target_link_libraries(carla-water PRIVATE OBS::libobs)
 
 target_sources(carla-water PRIVATE common.c)
-
-mark_as_advanced(carla-water)
