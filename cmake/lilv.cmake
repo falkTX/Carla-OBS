@@ -1,6 +1,6 @@
 # base config
 if(MSVC)
-  set(carla_lilv_compile_options /wd4005 /wd4244 /wd4267)
+  set(carla_lilv_compile_options /wd4005 /wd4090 /wd4133 /wd4244 /wd4267 /wd4273)
 else()
   set(carla_lilv_compile_options
       -Wno-error
