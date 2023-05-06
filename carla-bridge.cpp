@@ -46,6 +46,8 @@ struct BridgeTextReader {
 	{
 		delete[] text;
 	}
+
+	CARLA_DECLARE_NON_COPYABLE(BridgeTextReader)
 };
 
 // ----------------------------------------------------------------------------
