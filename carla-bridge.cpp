@@ -13,14 +13,15 @@
 #include "CarlaBackendUtils.hpp"
 #include "CarlaBase64Utils.hpp"
 
-#include "water/files/File.h"
-#include "water/misc/Time.h"
-#include "water/streams/MemoryOutputStream.h"
+// #include "water/files/File.h"
+// #include "water/misc/Time.h"
+// #include "water/streams/MemoryOutputStream.h"
 
 #include <ctime>
 
 // ----------------------------------------------------------------------------
 
+/* TODO
 static void stopProcess(water::ChildProcess *const process)
 {
 	// we only get here if bridge crashed or thread asked to exit
@@ -48,6 +49,7 @@ static void stopProcess(water::ChildProcess *const process)
 		}
 	}
 }
+*/
 
 // ----------------------------------------------------------------------------
 
@@ -145,6 +147,7 @@ void carla_bridge::cleanup()
 {
 	ready = false;
 
+	/* TODO
 	if (childprocess != nullptr) {
 		if (childprocess->isRunning()) {
 			nonRtClientCtrl.writeOpcode(
@@ -161,6 +164,7 @@ void carla_bridge::cleanup()
 		stopProcess(childprocess);
 		childprocess = nullptr;
 	}
+	*/
 
 	nonRtServerCtrl.clear();
 	nonRtClientCtrl.clear();
@@ -176,6 +180,7 @@ bool carla_bridge::start(const PluginType type,
 {
 	UNUSED_PARAMETER(binaryArchName);
 
+	/* TODO
 	if (childprocess == nullptr) {
 		childprocess = new water::ChildProcess();
 	} else if (childprocess->isRunning()) {
@@ -189,7 +194,7 @@ bool carla_bridge::start(const PluginType type,
 	// setup binary arch
 	water::ChildProcess::Type childType;
 #ifdef CARLA_OS_MAC
-	/**/ if (std::strcmp(binaryArchName, "arm64") == 0)
+	if (std::strcmp(binaryArchName, "arm64") == 0)
 		childType = water::ChildProcess::TypeARM;
 	else if (std::strcmp(binaryArchName == "x86_64") == 0)
 		childType = water::ChildProcess::TypeIntel;
@@ -219,6 +224,7 @@ bool carla_bridge::start(const PluginType type,
 
 	// uniqueId
 	arguments.add(water::String(static_cast<water::int64>(uniqueId)));
+	*/
 
 	bool started;
 
@@ -230,12 +236,17 @@ bool carla_bridge::start(const PluginType type,
 			bridgeBinary, getPluginTypeAsString(type), filename,
 			label, uniqueId);
 
-		started = childprocess->start(arguments, childType);
+		started = false;
+		/* TODO
+		childprocess->start(arguments, childType);
+		*/
 	}
 
 	if (!started) {
 		carla_stdout("failed!");
+		/* TODO
 		childprocess = nullptr;
+		*/
 		return false;
 	}
 
@@ -259,7 +270,10 @@ bool carla_bridge::start(const PluginType type,
 
 bool carla_bridge::isRunning() const
 {
+	return false;
+	/* TODO
 	return childprocess != nullptr && childprocess->isRunning();
+	*/
 }
 
 bool carla_bridge::isReady() const noexcept
@@ -269,6 +283,7 @@ bool carla_bridge::isReady() const noexcept
 
 bool carla_bridge::idle()
 {
+	/* TODO
 	if (childprocess == nullptr)
 		return false;
 
@@ -285,6 +300,7 @@ bool carla_bridge::idle()
 		cleanup();
 		return false;
 	}
+	*/
 
 	//         if (priv->loaded && fTimedOut && pData->active)
 	//             setActive(false, true, true);
@@ -426,6 +442,7 @@ void carla_bridge::load_chunk()
 							   info.chunk.size()));
 	CARLA_SAFE_ASSERT_RETURN(dataBase64.length() > 0,);
 
+	/* TODO
 	water::String filePath(water::File::getSpecialLocation(water::File::tempDirectory).getFullPathName());
 
 	filePath += CARLA_OS_SEP_STR ".CarlaChunk_";
@@ -442,6 +459,7 @@ void carla_bridge::load_chunk()
 		nonRtClientCtrl.writeCustomData(filePath.toRawUTF8(), ulength);
 		nonRtClientCtrl.commitWrite();
 	}
+	*/
 }
 
 void carla_bridge::save_and_wait()
@@ -888,6 +906,7 @@ void carla_bridge::readMessages()
 			nonRtServerCtrl.readCustomData(
 				chunkFilePath, chunkFilePathSize);
 
+			/* TODO
 			water::String realChunkFilePath(chunkFilePath);
 
 // #ifndef CARLA_OS_WIN
@@ -912,6 +931,7 @@ void carla_bridge::readMessages()
 
 			info.chunk = carla_getChunkFromBase64String(chunkFile.loadFileAsString().toRawUTF8());
 			chunkFile.deleteFile();
+			*/
 		} break;
 
 		// uint/latency

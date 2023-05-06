@@ -9,7 +9,7 @@
 #include "CarlaBackend.h"
 #include "CarlaBridgeUtils.hpp"
 
-#include "water/threads/ChildProcess.h"
+// #include "water/threads/ChildProcess.h"
 
 CARLA_BACKEND_USE_NAMESPACE
 
@@ -106,7 +106,7 @@ private:
 	BridgeNonRtClientControl nonRtClientCtrl; // fShmNonRtClientControl
 	BridgeNonRtServerControl nonRtServerCtrl; // fShmNonRtServerControl
 
-	CarlaScopedPointer<water::ChildProcess> childprocess;
+	// CarlaScopedPointer<water::ChildProcess> childprocess;
 
 	void readMessages();
 };

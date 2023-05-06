@@ -45,21 +45,54 @@ add_library(carla::water ALIAS carla-water)
 add_library(carla-bridge MODULE)
 add_library(OBS::carla-bridge ALIAS carla-bridge)
 
+target_compile_definitions(
+  carla-bridge
+  PRIVATE BUILDING_CARLA
+          CARLA_BACKEND_NAMESPACE=CarlaBridgeOBS
+          CARLA_MODULE_ID="carla_bridge"
+          CARLA_MODULE_NAME="Carla Bridge"
+          CARLA_PLUGIN_ONLY_BRIDGE
+          STATIC_PLUGIN_TARGET
+          $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
+          $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
+
+target_include_directories(
+  carla-bridge
+  PRIVATE carla/source
+          carla/source/backend
+          carla/source/frontend
+          carla/source/frontend/utils
+          carla/source/includes
+          carla/source/modules
+          carla/source/utils
+          ${LIBMAGIC_INCLUDE_DIRS})
+
 target_link_libraries(
   carla-bridge
   PRIVATE carla::jackbridge
           # OBS::carla_lilv OBS::carla_water
-          OBS::libobs # OBS::frontend-api Qt::Core Qt::Gui Qt::Widgets ${LIBMAGIC_LIBRARIES}
-)
+          OBS::libobs # OBS::frontend-api
+          Qt::Core
+          # Qt::Gui
+          Qt::Widgets
+          ${LIBMAGIC_LIBRARIES})
+
+if(NOT (OS_MACOS OR OS_WINDOWS))
+  target_link_options(carla-bridge PRIVATE -Wl,--no-undefined)
+endif()
 
 target_sources(
   carla-bridge
-  PRIVATE carla.c # carla-bridge.cpp carla-bridge-wrapper.cpp common.c qtutils.cpp
-  # carla/source/backend/utils/CachedPlugins.cpp carla/source/backend/utils/JUCE.cpp
-  # carla/source/backend/utils/Information.cpp carla/source/frontend/carla_frontend.cpp
-  # carla/source/frontend/pluginlist/pluginlistdialog.cpp carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
-  # carla/source/utils/CarlaBridgeUtils.cpp
-)
+  PRIVATE carla.c
+          carla-bridge.cpp
+          carla-bridge-wrapper.cpp
+          common.c
+          qtutils.cpp
+          # carla/source/backend/utils/CachedPlugins.cpp carla/source/backend/utils/JUCE.cpp
+          # carla/source/backend/utils/Information.cpp carla/source/frontend/carla_frontend.cpp
+          # carla/source/frontend/pluginlist/pluginlistdialog.cpp
+          # carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
+          carla/source/utils/CarlaBridgeUtils.cpp)
 
 if(OS_WINDOWS)
   set_property(
@@ -104,19 +137,8 @@ set_target_properties_obs(
 
 # ######################################################################################################################
 
-# target_compile_definitions( carla-bridge PRIVATE BUILDING_CARLA CARLA_BACKEND_NAMESPACE=CarlaBridgeOBS
-# CARLA_MODULE_ID="carla_bridge" CARLA_MODULE_NAME="Carla Bridge" CARLA_PLUGIN_ONLY_BRIDGE STATIC_PLUGIN_TARGET
-# REAL_BUILD $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC> $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
-
-# ######################################################################################################################
-
 # target_compile_options(carla-bridge PRIVATE -Wno-error -Wno-vla)
 
 # target_compile_options(carla-patchbay PRIVATE -Wno-error -Wno-vla)
-
-# target_include_directories( carla-bridge PRIVATE carla/source carla/source/backend carla/source/frontend
-# carla/source/frontend/utils carla/source/includes carla/source/modules carla/source/utils ${LIBMAGIC_INCLUDE_DIRS} )
-
-# ######################################################################################################################
 
 # ######################################################################################################################

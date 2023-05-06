@@ -205,6 +205,9 @@ void carla_priv_load(struct carla_priv *priv, obs_data_t *settings)
 void carla_priv_set_buffer_size(struct carla_priv *priv,
 				enum buffer_size_mode bufsize)
 {
+	// TODO
+	UNUSED_PARAMETER(priv);
+	UNUSED_PARAMETER(bufsize);
 }
 
 // ----------------------------------------------------------------------------
@@ -252,9 +255,11 @@ static bool carla_priv_select_plugin_callback(obs_properties_t *props,
 
 	struct carla_priv *priv = static_cast<struct carla_priv *>(data);
 
-	const PluginListDialogResults *plugin =
+	const PluginListDialogResults *plugin = nullptr;
+	/* TODO
 		carla_frontend_createAndExecPluginListDialog(
 			carla_qt_get_main_window());
+	*/
 
 	if (plugin == NULL)
 		return false;

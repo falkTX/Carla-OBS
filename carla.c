@@ -6,9 +6,6 @@
 
 #include <obs-module.h>
 #include <util/platform.h>
-int test = 1;
-
-#if 0 // TEST
 
 #ifndef CARLA_MODULE_ID
 #error CARLA_MODULE_ID undefined
@@ -352,7 +349,6 @@ static void carla_obs_load(void *data, obs_data_t *settings)
 	struct carla_data *carla = data;
 	carla_priv_load(carla->priv, settings);
 }
-#endif
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -366,7 +362,6 @@ MODULE_EXPORT const char *obs_module_description(void)
 
 bool obs_module_load(void)
 {
-#if 0
 	static const struct obs_source_info filter = {
 		.id = CARLA_MODULE_ID "_filter",
 		.type = OBS_SOURCE_TYPE_FILTER,
@@ -422,8 +417,6 @@ bool obs_module_load(void)
 	obs_register_source(&input);
 
 	return true;
-#endif // TEST
-	return false;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
