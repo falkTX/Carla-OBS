@@ -27,6 +27,8 @@
 extern "C" {
 #endif
 
+const char *get_carla_bin_path(void);
+
 void param_index_to_name(uint32_t index, char name[PARAM_NAME_SIZE]);
 void remove_all_props(obs_properties_t *props, obs_data_t *settings);
 

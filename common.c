@@ -4,11 +4,57 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
+// needed for libdl stuff
+#if !defined(_GNU_SOURCE) && !defined(_WIN32)
+#define _GNU_SOURCE
+#endif
+
 #include "common.h"
 
 #include <util/platform.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <dlfcn.h>
+#include <limits.h>
+#include <stdlib.h>
+#endif
+
 // ----------------------------------------------------------------------------
+
+static char* module_path = NULL;
+
+const char *get_carla_bin_path(void)
+{
+	if (module_path != NULL)
+		return module_path;
+
+#ifdef _WIN32
+#else
+	Dl_info info;
+	dladdr(get_carla_bin_path, &info);
+	module_path = realpath(info.dli_fname, NULL);
+#endif
+
+	if (module_path == NULL)
+		return NULL;
+
+	// find last separator
+	char *lastsep = strrchr(module_path, '/');
+	if (lastsep == NULL)
+		return NULL;
+
+	// truncate to ".../carla"
+	for (int i = 0; i < 6 /* strlen("/carla") */; i++) {
+		if (*lastsep == '\0')
+			return NULL;
+		++lastsep;
+	}
+	*lastsep = '\0';
+
+	return module_path;
+}
 
 void param_index_to_name(uint32_t index, char name[PARAM_NAME_SIZE])
 {

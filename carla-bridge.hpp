@@ -14,6 +14,9 @@
 
 #include <QtCore/QProcess>
 
+// generates warning if defined as anything else
+#define MAX_AV_PLANES 8
+
 CARLA_BACKEND_USE_NAMESPACE
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -91,10 +94,10 @@ struct carla_bridge {
 
 	void activate();
 	void deactivate();
-	void process(float *buffers[2], uint32_t frames);
+	void process(float *buffers[MAX_AV_PLANES], uint32_t frames);
 
+	void load_chunk(const char *b64chunk);
 	void save_and_wait();
-	void load_chunk();
 
 private:
 	char shmIdsStr[6 * 4 + 1] = {};

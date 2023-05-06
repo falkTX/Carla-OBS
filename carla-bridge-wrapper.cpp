@@ -11,11 +11,16 @@
 #include <util/platform.h>
 
 #include "CarlaBackendUtils.hpp"
-#include "CarlaBase64Utils.hpp"
 #include "CarlaFrontend.h"
 
 // generates a warning if this is defined as anything else
 #define CARLA_API
+
+#ifdef CARLA_OS_WIN
+# define APP_EXT ".exe"
+#else
+# define APP_EXT ""
+#endif
 
 // ----------------------------------------------------------------------------
 // private data methods
@@ -129,7 +134,7 @@ void carla_priv_save(struct carla_priv *priv, obs_data_t *settings)
 		char *b64ptr = CarlaString::asBase64(priv->bridge.info.chunk.data(),
 						     priv->bridge.info.chunk.size()).releaseBufferPointer();
 		const CarlaString b64chunk(b64ptr, false);
-		obs_data_set_string(settings, "chunk", b64chunk);
+		obs_data_set_string(settings, "chunk", b64chunk.buffer());
 	} else {
 		char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
 
@@ -170,9 +175,8 @@ void carla_priv_load(struct carla_priv *priv, obs_data_t *settings)
 			   filename, uniqueId);
 
 	if (priv->bridge.info.hints & PLUGIN_OPTION_USE_CHUNKS) {
-		const char *chunk = obs_data_get_string(settings, "chunk");
-		priv->bridge.info.chunk = carla_getChunkFromBase64String(chunk);
-		priv->bridge.load_chunk();
+		const char *b64chunk = obs_data_get_string(settings, "chunk");
+		priv->bridge.load_chunk(b64chunk);
 	}
 	else {
 		char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
@@ -239,11 +243,13 @@ static bool carla_priv_load_file_callback(obs_properties_t *props,
 	priv->bridge.cleanup();
 	priv->bridge.init(priv->bufferSize, priv->sampleRate);
 
+	const CarlaString binPath(get_carla_bin_path());
+
 	// TODO put in the correct types
 	// TODO show error message if bridge fails
 	priv->bridge.start(PLUGIN_VST2, "x86_64",
-			   "/usr/lib/carla/carla-bridge-native", "", filename,
-			   0);
+			   binPath + CARLA_OS_SEP_STR "carla-bridge-native" APP_EXT,
+			   "", filename, 0);
 
 	return carla_post_load_callback(priv, props);
 }
@@ -265,10 +271,12 @@ static bool carla_priv_select_plugin_callback(obs_properties_t *props,
 	priv->bridge.cleanup();
 	priv->bridge.init(priv->bufferSize, priv->sampleRate);
 
+	const CarlaString binPath(get_carla_bin_path());
+
 	// TODO show error message if bridge fails
 	priv->bridge.start((PluginType)plugin->type, "x86_64",
-			   "/usr/lib/carla/carla-bridge-native", plugin->label,
-			   plugin->filename, plugin->uniqueId);
+			   binPath + CARLA_OS_SEP_STR "carla-bridge-native" APP_EXT,
+			   plugin->label, plugin->filename, plugin->uniqueId);
 
 	return carla_post_load_callback(priv, props);
 }

@@ -19,6 +19,8 @@
 
 #include <ctime>
 
+#include <QtCore/QCoreApplication>
+
 struct BridgeTextReader {
 	char* text = nullptr;
 
@@ -207,9 +209,6 @@ bool carla_bridge::start(const PluginType type,
 			"CarlaPluginBridgeThread::run() - already running");
 	}
 
-	char strBuf[STR_MAX + 1];
-	strBuf[STR_MAX] = '\0';
-
 	/* TODO
 	// setup binary arch
 	water::ChildProcess::Type childType;
@@ -232,7 +231,7 @@ bool carla_bridge::start(const PluginType type,
 	QStringList arguments;
 
 	// bridge binary
-	// arguments.append(bridgeBinary);
+	// arguments.append(QString::fromUtf8(bridgeBinary));
 
 	// plugin type
 	arguments.append(QString::fromUtf8(getPluginTypeAsString(type)));
@@ -257,7 +256,10 @@ bool carla_bridge::start(const PluginType type,
 			label, uniqueId);
 
 		started = false;
-		childprocess->start(bridgeBinary, arguments);
+		childprocess->setInputChannelMode(QProcess::ForwardedInputChannel);
+		childprocess->setProcessChannelMode(QProcess::ForwardedChannels);
+		childprocess->start(bridgeBinary, arguments, QIODevice::NotOpen);
+		started = childprocess->waitForStarted(5000) && childprocess->state() == QProcess::Running;
 	}
 
 	if (!started) {
@@ -266,13 +268,17 @@ bool carla_bridge::start(const PluginType type,
 		return false;
 	}
 
+	carla_stdout("started ok!");
+
 	ready = false;
 	timedOut = false;
 
-	while (isRunning() && idle() && !ready)
-		carla_msleep(5);
+	while (isRunning() && idle() && !ready) {
+		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 500);
+		carla_stdout("waiting to for start... %d", childprocess->state());
+	}
 
-	if (ready && activated) {
+	if (ready /* && activated */) {
 		nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientActivate);
 		nonRtClientCtrl.commitWrite();
 	}
@@ -286,7 +292,7 @@ bool carla_bridge::start(const PluginType type,
 
 bool carla_bridge::isRunning() const
 {
-	return childprocess != nullptr && childprocess->state() != QProcess::NotRunning;
+	return childprocess != nullptr && childprocess->state() == QProcess::Running;
 }
 
 bool carla_bridge::isReady() const noexcept
@@ -299,17 +305,22 @@ bool carla_bridge::idle()
 	if (childprocess == nullptr)
 		return false;
 
-	if (childprocess->state() != QProcess::NotRunning) {
+	switch (childprocess->state()) {
+	case QProcess::Running: {
 		const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
 
 		nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientPing);
 		nonRtClientCtrl.commitWrite();
-	} else {
+		break;
+	}
+	case QProcess::NotRunning:
 		//         fTimedError = true;
 		printf("bridge closed by itself!\n");
 		activated = false;
 		timedOut = true;
 		cleanup();
+		return false;
+	default:
 		return false;
 	}
 
@@ -418,13 +429,13 @@ void carla_bridge::deactivate()
 	}
 }
 
-void carla_bridge::process(float *buffers[2], uint32_t frames)
+void carla_bridge::process(float *buffers[MAX_AV_PLANES], uint32_t frames)
 {
-	CARLA_SAFE_ASSERT_RETURN(activated, );
-	CARLA_SAFE_ASSERT_RETURN(ready, );
-
-	if (!isRunning())
+	if (!ready || !isRunning())
 		return;
+
+	CARLA_SAFE_ASSERT_RETURN(activated, );
+	// CARLA_SAFE_ASSERT_RETURN(ready, );
 
 	rtClientCtrl.data->timeInfo.usecs = os_gettime_ns() / 1000;
 
@@ -447,11 +458,9 @@ void carla_bridge::process(float *buffers[2], uint32_t frames)
 	}
 }
 
-void carla_bridge::load_chunk()
+void carla_bridge::load_chunk(const char *b64chunk)
 {
-	const CarlaString dataBase64(CarlaString::asBase64(info.chunk.data(),
-							   info.chunk.size()));
-	CARLA_SAFE_ASSERT_RETURN(dataBase64.length() > 0,);
+	info.chunk = carla_getChunkFromBase64String(b64chunk);
 
 	/* TODO
 	water::String filePath(water::File::getSpecialLocation(water::File::tempDirectory).getFullPathName());

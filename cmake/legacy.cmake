@@ -75,7 +75,8 @@ target_link_libraries(
   PRIVATE carla::jackbridge
           carla::lilv
           # carla::water
-          OBS::libobs # OBS::frontend-api
+          OBS::libobs
+          # OBS::frontend-api
           Qt::Core
           # Qt::Gui
           Qt::Widgets
@@ -93,10 +94,10 @@ target_sources(
           common.c
           qtutils.cpp
           carla/source/backend/utils/CachedPlugins.cpp
-          # carla/source/backend/utils/Information.cpp
+          carla/source/backend/utils/Information.cpp
           carla/source/frontend/carla_frontend.cpp
           carla/source/frontend/pluginlist/pluginlistdialog.cpp
-          # carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
+          carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
           carla/source/utils/CarlaBridgeUtils.cpp)
 
 set_target_properties(
