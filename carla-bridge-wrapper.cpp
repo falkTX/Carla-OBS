@@ -255,11 +255,9 @@ static bool carla_priv_select_plugin_callback(obs_properties_t *props,
 
 	struct carla_priv *priv = static_cast<struct carla_priv *>(data);
 
-	const PluginListDialogResults *plugin = nullptr;
-	/* TODO
+	const PluginListDialogResults *plugin =
 		carla_frontend_createAndExecPluginListDialog(
 			carla_qt_get_main_window());
-	*/
 
 	if (plugin == NULL)
 		return false;
@@ -432,3 +430,10 @@ void carla_priv_free(void *data)
 }
 
 // ----------------------------------------------------------------------------
+
+// these do nothing
+extern "C" {
+void carla_juce_init() {}
+void carla_juce_idle() {}
+void carla_juce_cleanup() {}
+}

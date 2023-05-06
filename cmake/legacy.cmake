@@ -50,6 +50,7 @@ add_library(OBS::carla-bridge ALIAS carla-bridge)
 target_compile_definitions(
   carla-bridge
   PRIVATE BUILDING_CARLA
+          BUILDING_CARLA_OBS
           CARLA_BACKEND_NAMESPACE=CarlaBridgeOBS
           CARLA_MODULE_ID="carla_bridge"
           CARLA_MODULE_NAME="Carla Bridge"
@@ -72,7 +73,8 @@ target_include_directories(
 target_link_libraries(
   carla-bridge
   PRIVATE carla::jackbridge
-          # OBS::carla_lilv OBS::carla_water
+          carla::lilv
+          # carla::water
           OBS::libobs # OBS::frontend-api
           Qt::Core
           # Qt::Gui
@@ -90,9 +92,10 @@ target_sources(
           carla-bridge-wrapper.cpp
           common.c
           qtutils.cpp
-          # carla/source/backend/utils/CachedPlugins.cpp carla/source/backend/utils/JUCE.cpp
-          # carla/source/backend/utils/Information.cpp carla/source/frontend/carla_frontend.cpp
-          # carla/source/frontend/pluginlist/pluginlistdialog.cpp
+          carla/source/backend/utils/CachedPlugins.cpp
+          # carla/source/backend/utils/Information.cpp
+          carla/source/frontend/carla_frontend.cpp
+          carla/source/frontend/pluginlist/pluginlistdialog.cpp
           # carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
           carla/source/utils/CarlaBridgeUtils.cpp)
 
