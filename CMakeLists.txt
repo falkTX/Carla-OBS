@@ -120,7 +120,9 @@ target_compile_definitions(
           $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
           $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
 
-target_compile_options(carla-patchbay PRIVATE -Wno-vla)
+if(NOT MSVC)
+  target_compile_options(carla-patchbay PRIVATE -Wno-vla)
+endif()
 
 target_include_directories(
   carla-patchbay
