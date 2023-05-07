@@ -68,14 +68,8 @@ target_include_directories(
           carla/source/utils
           ${LIBMAGIC_INCLUDE_DIRS})
 
-target_link_libraries(
-  carla-bridge
-  PRIVATE carla::jackbridge
-          carla::lilv
-          OBS::libobs
-          Qt::Core
-          Qt::Widgets
-          ${LIBMAGIC_LIBRARIES})
+target_link_libraries(carla-bridge PRIVATE carla::jackbridge carla::lilv OBS::libobs Qt::Core Qt::Widgets
+                                           ${LIBMAGIC_LIBRARIES})
 
 if(NOT (OS_MACOS OR OS_WINDOWS))
   target_link_options(carla-bridge PRIVATE -Wl,--no-undefined)
@@ -174,5 +168,9 @@ target_sources(
           carla/source/backend/plugin/CarlaPlugin.cpp
           carla/source/backend/plugin/CarlaPluginBridge.cpp
           carla/source/backend/plugin/CarlaPluginInternal.cpp)
+
+if(OS_MACOS)
+  set_source_files_properties(carla/source/backend/engine/CarlaEngineNative.cpp PROPERTIES COMPILE_FLAGS -ObjC++)
+endif()
 
 set_target_properties_obs(carla-patchbay PROPERTIES FOLDER plugins PREFIX "")
