@@ -425,6 +425,34 @@ static bool carla_priv_param_changed(void *data, obs_properties_t *props,
 	return false;
 }
 
+static bool carla_priv_show_gui_callback(obs_properties_t *props,
+					 obs_property_t *property, void *data)
+{
+	UNUSED_PARAMETER(props);
+	UNUSED_PARAMETER(property);
+
+	struct carla_priv *priv = data;
+
+	// FIXME check if needed, frontend already sets these?
+	char winIdStr[24];
+	snprintf(winIdStr, sizeof(winIdStr), "%llx",
+		 (ulonglong)carla_qt_get_main_window_id());
+	priv->descriptor->dispatcher(priv->handle,
+				     NATIVE_PLUGIN_OPCODE_HOST_OPTION,
+				     ENGINE_OPTION_FRONTEND_WIN_ID,
+				     0, winIdStr, 0.f);
+
+	const double scaleFactor = carla_qt_get_scale_factor();
+	priv->descriptor->dispatcher(priv->handle,
+				     NATIVE_PLUGIN_OPCODE_HOST_OPTION,
+				     ENGINE_OPTION_FRONTEND_UI_SCALE,
+				     (intptr_t)(scaleFactor * 1000), NULL, 0.f);
+
+	priv->descriptor->ui_show(priv->handle, true);
+
+	return false;
+}
+
 void carla_priv_readd_properties(struct carla_priv *priv,
 				 obs_properties_t *props, bool reset)
 {
@@ -510,36 +538,6 @@ void carla_priv_readd_properties(struct carla_priv *priv,
 	}
 
 	obs_data_release(settings);
-}
-
-// ----------------------------------------------------------------------------
-
-bool carla_priv_show_gui_callback(obs_properties_t *props,
-				  obs_property_t *property, void *data)
-{
-	UNUSED_PARAMETER(props);
-	UNUSED_PARAMETER(property);
-
-	struct carla_priv *priv = data;
-
-	// FIXME check if needed, frontend already sets these?
-	char winIdStr[24];
-	snprintf(winIdStr, sizeof(winIdStr), "%llx",
-		 (ulonglong)carla_qt_get_main_window_id());
-	priv->descriptor->dispatcher(priv->handle,
-				     NATIVE_PLUGIN_OPCODE_HOST_OPTION,
-				     ENGINE_OPTION_FRONTEND_WIN_ID,
-				     0, winIdStr, 0.f);
-
-	const double scaleFactor = carla_qt_get_scale_factor();
-	priv->descriptor->dispatcher(priv->handle,
-				     NATIVE_PLUGIN_OPCODE_HOST_OPTION,
-				     ENGINE_OPTION_FRONTEND_UI_SCALE,
-				     (intptr_t)(scaleFactor * 1000), NULL, 0.f);
-
-	priv->descriptor->ui_show(priv->handle, true);
-
-	return false;
 }
 
 // ----------------------------------------------------------------------------

@@ -340,6 +340,19 @@ static bool carla_priv_select_plugin_callback(obs_properties_t *props,
 	return carla_post_load_callback(priv, props);
 }
 
+static bool carla_priv_show_gui_callback(obs_properties_t *props,
+					 obs_property_t *property, void *data)
+{
+	UNUSED_PARAMETER(props);
+	UNUSED_PARAMETER(property);
+
+	struct carla_priv *priv = static_cast<struct carla_priv *>(data);
+
+	priv->bridge.show_ui();
+
+	return false;
+}
+
 static bool carla_priv_param_changed(void *data, obs_properties_t *props,
 				     obs_property_t *property,
 				     obs_data_t *settings)
@@ -472,21 +485,6 @@ void carla_priv_readd_properties(struct carla_priv *priv,
 	}
 
 	obs_data_release(settings);
-}
-
-// ----------------------------------------------------------------------------
-
-bool carla_priv_show_gui_callback(obs_properties_t *props,
-				  obs_property_t *property, void *data)
-{
-	UNUSED_PARAMETER(props);
-	UNUSED_PARAMETER(property);
-
-	struct carla_priv *priv = static_cast<struct carla_priv *>(data);
-
-	priv->bridge.show_ui();
-
-	return false;
 }
 
 // ----------------------------------------------------------------------------

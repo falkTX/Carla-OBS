@@ -19,8 +19,6 @@ enum buffer_size_mode {
 	buffer_size_buffered_max = buffer_size_buffered_512
 };
 
-struct carla_priv;
-
 // ----------------------------------------------------------------------------
 // helper methods
 
@@ -43,6 +41,8 @@ static inline uint32_t bufsize_mode_to_frames(enum buffer_size_mode bufsize)
 extern "C" {
 #endif
 
+struct carla_priv;
+
 struct carla_priv *carla_priv_create(obs_source_t *source,
 				     enum buffer_size_mode bufsize,
 				     uint32_t srate);
@@ -63,9 +63,6 @@ void carla_priv_set_buffer_size(struct carla_priv *priv,
 
 void carla_priv_readd_properties(struct carla_priv *carla,
 				 obs_properties_t *props, bool reset);
-
-bool carla_priv_show_gui_callback(obs_properties_t *props,
-				  obs_property_t *property, void *data);
 
 #ifdef __cplusplus
 }

@@ -65,8 +65,7 @@ static void* carla_obs_audio_gen_thread(void *data)
 		out.data[c] = (const uint8_t *)carla->buffers[c];
 
 	const uint32_t sample_rate = carla->sample_rate;
-
-	uint64_t start_time = out.timestamp = os_gettime_ns();
+	const uint64_t start_time = out.timestamp = os_gettime_ns();
 	uint64_t total_samples = 0;
 
 	while (carla->audiogen_running) {
