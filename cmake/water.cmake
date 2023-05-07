@@ -38,7 +38,7 @@ if(NOT OS_WINDOWS)
 endif()
 
 if(MSVC)
-
+  target_compile_options(carla-water PRIVATE /wd4267)
 else()
   target_compile_options(carla-water PRIVATE -Wno-deprecated-copy)
 endif()
