@@ -38,7 +38,8 @@ add_library(carla::lilv ALIAS carla-lilv)
 include(cmake/rtmempool.cmake)
 add_library(carla::rtmempool ALIAS carla-rtmempool)
 
-# include(cmake/water.cmake) add_library(carla::water ALIAS carla-water)
+include(cmake/water.cmake)
+add_library(carla::water ALIAS carla-water)
 
 # Setup carla-bridge target
 add_library(carla-bridge MODULE)
@@ -71,11 +72,8 @@ target_link_libraries(
   carla-bridge
   PRIVATE carla::jackbridge
           carla::lilv
-          # carla::water
           OBS::libobs
-          # OBS::frontend-api
           Qt::Core
-          # Qt::Gui
           Qt::Widgets
           ${LIBMAGIC_LIBRARIES})
 
@@ -178,11 +176,3 @@ target_sources(
           carla/source/backend/plugin/CarlaPluginInternal.cpp)
 
 set_target_properties_obs(carla-patchbay PROPERTIES FOLDER plugins PREFIX "")
-
-# ######################################################################################################################
-
-# target_compile_options(carla-bridge PRIVATE -Wno-error -Wno-vla)
-
-# target_compile_options(carla-patchbay PRIVATE -Wno-error -Wno-vla)
-
-# ######################################################################################################################
