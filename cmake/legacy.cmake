@@ -97,7 +97,7 @@ set_target_properties(
   PROPERTIES AUTOMOC ON
              AUTOUIC ON
              AUTORCC ON
-             FOLDER "plugins/carla"
+             FOLDER plugins
              PREFIX "")
 
 if(_QT_VERSION EQUAL 6 AND OS_WINDOWS)
@@ -178,7 +178,7 @@ if(NOT OS_WINDOWS)
     set_source_files_properties(carla/source/backend/engine/CarlaEngineNative.cpp PROPERTIES COMPILE_FLAGS -ObjC++)
   endif()
 
-  set_target_properties(carla-patchbay PROPERTIES FOLDER "plugins/carla")
+  set_target_properties(carla-patchbay PROPERTIES FOLDER plugins)
 
   setup_plugin_target(carla-patchbay)
 
