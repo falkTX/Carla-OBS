@@ -239,7 +239,7 @@ struct carla_priv *carla_priv_create(obs_source_t *source,
 	{
 		NativeHostDescriptor host = {
 			.handle = priv,
-			.resourceDir = "/usr/share/carla/resources",
+			.resourceDir = get_carla_resource_path(),
 			.uiName = "Carla-OBS",
 			.uiParentId = 0,
 			.get_buffer_size = host_get_buffer_size,
@@ -270,7 +270,7 @@ struct carla_priv *carla_priv_create(obs_source_t *source,
 
 	descriptor->dispatcher(priv->handle,
 			       NATIVE_PLUGIN_OPCODE_HOST_OPTION,
-			       ENGINE_OPTION_PATH_BINARIES, 0, "/usr/lib/carla", 0.f);
+			       ENGINE_OPTION_PATH_BINARIES, 0, (void*)get_carla_bin_path(), 0.f);
 
 	return priv;
 
@@ -408,7 +408,6 @@ static bool carla_priv_param_changed(void *data, obs_properties_t *props,
 		return false;
 	}
 
-	// printf("param changed %d:%s %f\n", pindex, pname, value);
 	priv->descriptor->set_parameter_value(priv->handle, pindex, value);
 
 	// UI param change notification needs to happen on main thread

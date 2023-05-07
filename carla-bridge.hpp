@@ -19,7 +19,20 @@
 
 CARLA_BACKEND_USE_NAMESPACE
 
-// --------------------------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+
+class BridgeProcess : public QProcess {
+    Q_OBJECT
+
+public:
+	BridgeProcess();
+
+public Q_SLOTS:
+	void start();
+	void stop();
+};
+
+// ----------------------------------------------------------------------------
 
 struct carla_param_data {
 	uint32_t hints = 0;
@@ -55,6 +68,8 @@ struct carla_bridge_info {
 		filename.clear();
 	}
 };
+
+// ----------------------------------------------------------------------------
 
 struct carla_bridge_callback {
 	virtual ~carla_bridge_callback(){};
@@ -120,9 +135,9 @@ private:
 	BridgeNonRtClientControl nonRtClientCtrl; // fShmNonRtClientControl
 	BridgeNonRtServerControl nonRtServerCtrl; // fShmNonRtServerControl
 
-	QProcess *childprocess = nullptr;
+	BridgeProcess *childprocess = nullptr;
 
 	void readMessages();
 };
 
-// --------------------------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------

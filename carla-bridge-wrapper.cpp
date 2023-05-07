@@ -224,7 +224,6 @@ void carla_priv_load(struct carla_priv *priv, obs_data_t *settings)
 			const char *type = obs_data_get_string(data, "type");
 			const char *key = obs_data_get_string(data, "key");
 			const char *value = obs_data_get_string(data, "value");
-			carla_stdout("sending custom data with values:\n%s\n%s\n%s", type, key, value);
 			priv->bridge.add_custom_data(type, key, value, true);
 		}
 		priv->bridge.custom_data_loaded();

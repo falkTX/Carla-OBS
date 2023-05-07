@@ -16,7 +16,7 @@
 #endif
 
 #include "carla-wrapper.h"
-#include <util/platform.h>
+#include "common.h"
 
 // for audio generator thread
 #include <pthread.h>
@@ -352,18 +352,42 @@ static void carla_obs_load(void *data, obs_data_t *settings)
 
 // --------------------------------------------------------------------------------------------------------------------
 
-// CARLA_MODULE_ID
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("carla", "en-US")
-MODULE_EXPORT const char *obs_module_description(void)
+OBS_MODULE_AUTHOR("Filipe Coelho")
+const char *obs_module_name(void)
 {
-	return "carla patchbay"; // CARLA_MODULE_NAME;
+	return CARLA_MODULE_NAME;
 }
+/*
+const char *obs_module_description(void)
+{
+	return CARLA_MODULE_NAME;
+}
+*/
 
 bool obs_module_load(void)
 {
+	const char *carla_bin_path = get_carla_bin_path();
+	if (!carla_bin_path) {
+		blog(LOG_WARNING,
+		     "[" CARLA_MODULE_ID "] failed to find binaries, will not load module");
+		return false;
+	}
+	blog(LOG_INFO, "[" CARLA_MODULE_ID "] using binary path %s", carla_bin_path);
+
+#ifndef BUILDING_CARLA_OBS
+	const char *carla_res_path = get_carla_resource_path();
+	if (!carla_res_path) {
+		blog(LOG_WARNING,
+		     "[" CARLA_MODULE_ID "] failed to find resources, will not load module");
+		return false;
+	}
+	blog(LOG_INFO, "[" CARLA_MODULE_ID "] using resource path %s", carla_res_path);
+#endif
+
 	static const struct obs_source_info filter = {
-		.id = CARLA_MODULE_ID "_filter",
+		.id = CARLA_MODULE_ID "-filter",
 		.type = OBS_SOURCE_TYPE_FILTER,
 		.output_flags = OBS_SOURCE_AUDIO,
 		.get_name = carla_obs_get_name,
@@ -391,7 +415,7 @@ bool obs_module_load(void)
 	obs_register_source(&filter);
 
 	static const struct obs_source_info input = {
-		.id = CARLA_MODULE_ID "_input",
+		.id = CARLA_MODULE_ID "-input",
 		.type = OBS_SOURCE_TYPE_INPUT,
 		.output_flags = OBS_SOURCE_AUDIO,
 		.get_name = carla_obs_get_name,

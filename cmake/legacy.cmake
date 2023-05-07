@@ -53,7 +53,7 @@ target_compile_definitions(
   PRIVATE BUILDING_CARLA
           BUILDING_CARLA_OBS
           CARLA_BACKEND_NAMESPACE=CarlaBridgeOBS
-          CARLA_MODULE_ID="carla_bridge"
+          CARLA_MODULE_ID="carla-bridge"
           CARLA_MODULE_NAME="Carla Bridge"
           CARLA_PLUGIN_ONLY_BRIDGE
           STATIC_PLUGIN_TARGET
@@ -116,7 +116,7 @@ if(NOT OS_WINDOWS)
     carla-patchbay
     PRIVATE BUILDING_CARLA
             CARLA_BACKEND_NAMESPACE=CarlaPatchbayOBS
-            CARLA_MODULE_ID="carla_patchbay"
+            CARLA_MODULE_ID="carla-patchbay"
             CARLA_MODULE_NAME="Carla Patchbay"
             CARLA_PLUGIN_BUILD
             CARLA_PLUGIN_ONLY_BRIDGE

@@ -11,6 +11,7 @@
 
 #include "common.h"
 
+#include <obs-module.h>
 #include <util/platform.h>
 
 #ifdef _WIN32
@@ -21,9 +22,28 @@
 #include <stdlib.h>
 #endif
 
+#ifdef _MSC_VER
+#define strdup _strdup
+#endif
+
 // ----------------------------------------------------------------------------
 
+static const struct {
+	const char *bin;
+	const char *res;
+} carla_system_paths[] = {
+#ifdef __APPLE__
+	{ "~/Applications/Carla.app/Contents/MacOS", "~/Applications/Carla.app/Contents/MacOS/resources" },
+	{ "/Applications/Carla.app/Contents/MacOS", "/Applications/Carla.app/Contents/MacOS/resources" },
+#endif
+#ifndef _WIN32
+	{ "/usr/local/lib/carla", "/usr/local/share/carla/resources" },
+	{ "/usr/lib/carla", "/usr/share/carla/resources" },
+#endif
+};
+
 static char* module_path = NULL;
+static const char* resource_path = NULL;
 
 const char *get_carla_bin_path(void)
 {
@@ -38,22 +58,56 @@ const char *get_carla_bin_path(void)
 #endif
 
 	if (module_path == NULL)
-		return NULL;
+		goto fail;
 
 	// find last separator
 	char *lastsep = strrchr(module_path, '/');
 	if (lastsep == NULL)
-		return NULL;
+		goto free;
 
 	// truncate to ".../carla"
 	for (int i = 0; i < 6 /* strlen("/carla") */; i++) {
 		if (*lastsep == '\0')
-			return NULL;
+			goto free;
 		++lastsep;
 	}
 	*lastsep = '\0';
 
+	if (os_file_exists(module_path))
+		return module_path;
+
+free:
+	free(module_path);
+	module_path = NULL;
+
+fail:
+	for (size_t i = 0; i < sizeof(carla_system_paths)/sizeof(carla_system_paths[0]); ++i) {
+		if (os_file_exists(carla_system_paths[i].bin)) {
+			/* NOTE we are intentionally not using bstrdup,
+			   as a previous allocation could be done by `realpath`
+			   so we keep everything `free` compatible. */
+			module_path = strdup(carla_system_paths[i].bin);
+			resource_path = carla_system_paths[i].res;
+			break;
+		}
+	}
+
 	return module_path;
+}
+
+const char *get_carla_resource_path(void)
+{
+	if (resource_path != NULL)
+		return resource_path;
+
+	for (size_t i = 0; i < sizeof(carla_system_paths)/sizeof(carla_system_paths[0]); ++i) {
+		if (os_file_exists(carla_system_paths[i].res)) {
+			resource_path = carla_system_paths[i].res;
+			break;
+		}
+	}
+
+	return resource_path;
 }
 
 void param_index_to_name(uint32_t index, char name[PARAM_NAME_SIZE])
@@ -113,6 +167,12 @@ void handle_update_request(obs_source_t *source, uint64_t *update_req)
 		signal_handler_signal(sighandler, "update_properties",
 					NULL);
 	}
+}
+
+void obs_module_unload(void)
+{
+	free(module_path);
+	module_path = NULL;
 }
 
 // ----------------------------------------------------------------------------

@@ -56,18 +56,35 @@ struct BridgeTextReader {
 	CARLA_DECLARE_NON_COPYABLE(BridgeTextReader)
 };
 
-static void qprocess_start_main_thread(void *data)
+// ----------------------------------------------------------------------------
+
+BridgeProcess::BridgeProcess()
 {
-	QProcess *proc = static_cast<QProcess *>(data);
-	proc->setInputChannelMode(QProcess::ForwardedInputChannel);
-	proc->setProcessChannelMode(QProcess::ForwardedChannels);
-	proc->start(QIODevice::Unbuffered);
+	moveToThread(qApp->thread());
 }
 
-static void qprocess_cleanup_main_thread(void *data)
+void BridgeProcess::start()
 {
-	QProcess *proc = static_cast<QProcess *>(data);
-	proc->deleteLater();
+	setInputChannelMode(QProcess::ForwardedInputChannel);
+	setProcessChannelMode(QProcess::ForwardedChannels);
+	QProcess::start(QIODevice::Unbuffered);
+}
+
+void BridgeProcess::stop()
+{
+	if (state() != QProcess::NotRunning) {
+		terminate();
+		waitForFinished(2000);
+
+		if (state() != QProcess::NotRunning) {
+			blog(LOG_INFO, "[" CARLA_MODULE_ID "] bridge refused to close, force kill now");
+			kill();
+		} else {
+			blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] bridge auto-closed successfully");
+		}
+	}
+
+	deleteLater();
 }
 
 // ----------------------------------------------------------------------------
@@ -77,24 +94,24 @@ bool carla_bridge::init(uint32_t maxBufferSize, double sampleRate)
 	std::srand(static_cast<uint>(std::time(nullptr)));
 
 	if (!audiopool.initializeServer()) {
-		carla_stderr("Failed to initialize shared memory audio pool");
+		blog(LOG_WARNING, "[" CARLA_MODULE_ID "] Failed to initialize shared memory audio pool");
 		return false;
 	}
 
 	audiopool.resize(maxBufferSize, MAX_AV_PLANES, MAX_AV_PLANES);
 
 	if (!rtClientCtrl.initializeServer()) {
-		carla_stderr("Failed to initialize RT client control");
+		blog(LOG_WARNING, "[" CARLA_MODULE_ID "] Failed to initialize RT client control");
 		goto fail1;
 	}
 
 	if (!nonRtClientCtrl.initializeServer()) {
-		carla_stderr("Failed to initialize Non-RT client control");
+		blog(LOG_WARNING, "[" CARLA_MODULE_ID "] Failed to initialize Non-RT client control");
 		goto fail2;
 	}
 
 	if (!nonRtServerCtrl.initializeServer()) {
-		carla_stderr("Failed to initialize Non-RT server control");
+		blog(LOG_WARNING, "[" CARLA_MODULE_ID "] Failed to initialize Non-RT server control");
 		goto fail3;
 	}
 
@@ -148,7 +165,7 @@ bool carla_bridge::init(uint32_t maxBufferSize, double sampleRate)
 
 	bufferSize = maxBufferSize;
 	timedOut = false;
-	carla_stdout("init bridge with %u buffer size", bufferSize);
+	blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] init bridge with %u buffer size", bufferSize);
 
 	return true;
 
@@ -168,7 +185,10 @@ void carla_bridge::cleanup()
 	ready = false;
 
 	if (childprocess != nullptr) {
-		if (childprocess->state() != QProcess::NotRunning) {
+		BridgeProcess *proc = childprocess;
+		childprocess = nullptr;
+
+		if (proc->state() != QProcess::NotRunning) {
 			nonRtClientCtrl.writeOpcode(
 				kPluginBridgeNonRtClientQuit);
 			nonRtClientCtrl.commitWrite();
@@ -178,24 +198,11 @@ void carla_bridge::cleanup()
 
 			if (!timedOut)
 				wait("stopping", 3000);
-
-			childprocess->terminate();
-			childprocess->waitForFinished(2000);
-
-			if (childprocess->state() != QProcess::NotRunning) {
-				carla_stdout(
-					"carla_bridge::cleanup() - bridge refused to close, force kill now");
-				childprocess->kill();
-			} else {
-				carla_stdout(
-					"carla_bridge::cleanup() - bridge auto-closed successfully");
-			}
 		}
 		else {
 			// forced quit, may have crashed
-			if (childprocess->exitStatus() == QProcess::CrashExit) {
-				carla_stderr(
-					"carla_bridge::cleanup() - bridge crashed");
+			if (proc->exitStatus() == QProcess::CrashExit) {
+				blog(LOG_WARNING, "[" CARLA_MODULE_ID "] carla_bridge::cleanup() - bridge crashed");
 
 				/*
 				QMessageBox::critical(
@@ -209,9 +216,7 @@ void carla_bridge::cleanup()
 			}
 		}
 
-		QProcess *childprocess2 = childprocess;
-		childprocess = nullptr;
-		carla_qt_callback_on_main_thread(qprocess_cleanup_main_thread, childprocess2);
+		QMetaObject::invokeMethod(proc, "stop");
 	}
 
 	nonRtServerCtrl.clear();
@@ -232,7 +237,7 @@ bool carla_bridge::start(const PluginType type,
 
 	UNUSED_PARAMETER(binaryArchName);
 
-	QProcess *proc = new QProcess();
+	BridgeProcess *proc = new BridgeProcess();
 
 	/* TODO
 	// setup binary arch
@@ -272,43 +277,36 @@ bool carla_bridge::start(const PluginType type,
 	{
 		const CarlaScopedEnvVar sev("ENGINE_BRIDGE_SHM_IDS", shmIdsStr);
 
-		carla_stdout(
-			"Starting plugin bridge, command is:\n%s \"%s\" \"%s\" \"%s\" " P_INT64,
+		blog(LOG_INFO, "[" CARLA_MODULE_ID "] Starting plugin bridge, command is:\n%s \"%s\" \"%s\" \"%s\" " P_INT64,
 			bridgeBinary, getPluginTypeAsString(type), filename,
 			label, uniqueId);
 
 		started = false;
 		proc->setProgram(QString::fromUtf8(bridgeBinary));
 		proc->setArguments(arguments);
-		// carla_qt_callback_on_main_thread(
-		// qprocess_start_main_thread(proc);
-		// carla_sleep(1);
-		proc->setInputChannelMode(QProcess::ForwardedInputChannel);
-		proc->setProcessChannelMode(QProcess::ForwardedChannels);
-		proc->start(QIODevice::Unbuffered);
+		QMetaObject::invokeMethod(proc, "start");
 		started = proc->waitForStarted(5000) && proc->state() == QProcess::Running;
 	}
 
 	if (!started) {
-		carla_stdout("failed!");
-		carla_qt_callback_on_main_thread(qprocess_cleanup_main_thread, proc);
-		proc = nullptr;
+		blog(LOG_INFO, "[" CARLA_MODULE_ID "] failed!");
+		QMetaObject::invokeMethod(proc, "stop");
 		return false;
 	}
 
-	carla_stdout("started ok!");
+	blog(LOG_INFO, "[" CARLA_MODULE_ID "] started ok!");
 
 	ready = false;
 	timedOut = false;
 
 	while (proc != nullptr && proc->state() == QProcess::Running && !ready) {
 		readMessages();
-		// carla_msleep(5);
-		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents|QEventLoop::ExcludeSocketNotifiers, 50);
+		carla_msleep(5);
 	}
 
 	if (! ready) {
-		carla_qt_callback_on_main_thread(qprocess_cleanup_main_thread, proc);
+		blog(LOG_WARNING, "[" CARLA_MODULE_ID "] failed to start plugin bridge");
+		QMetaObject::invokeMethod(proc, "stop");
 		return false;
 	}
 
@@ -351,7 +349,7 @@ bool carla_bridge::idle()
 	}
 	case QProcess::NotRunning:
 		//         fTimedError = true;
-		printf("bridge closed by itself!\n");
+		blog(LOG_INFO, "[" CARLA_MODULE_ID "] bridge closed by itself!");
 		// activated = false;
 		timedOut = true;
 		cleanup();
@@ -380,7 +378,7 @@ bool carla_bridge::wait(const char *const action, const uint msecs)
 		return true;
 
 	timedOut = true;
-	carla_stderr2("waitForClient(%s) timed out", action);
+	blog(LOG_WARNING, "[" CARLA_MODULE_ID "] waitForClient(%s) timed out", action);
 	return false;
 }
 
@@ -665,8 +663,8 @@ void carla_bridge::readMessages()
 		// #ifdef DEBUG
 		if (opcode != kPluginBridgeNonRtServerPong &&
 			opcode != kPluginBridgeNonRtServerParameterValue2) {
-			carla_stdout(
-				"CarlaPluginBridge::handleNonRtData() - got opcode: %s",
+			blog(LOG_DEBUG,
+				"carla_bridge::readMessages() - got opcode: %s",
 				PluginBridgeNonRtServerOpcode2str(
 					opcode));
 		}
@@ -975,7 +973,7 @@ void carla_bridge::readMessages()
 				if (fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
 				{
 					const StringArray driveLetterSplit(StringArray::fromTokens(realBigValueFilePath, ":/", ""));
-					carla_stdout("big value save path BEFORE => %s", realBigValueFilePath.toRawUTF8());
+					blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] big value save path BEFORE => %s", realBigValueFilePath.toRawUTF8());
 
 					realBigValueFilePath  = fWinePrefix;
 					realBigValueFilePath += "/drive_";
@@ -983,7 +981,7 @@ void carla_bridge::readMessages()
 					realBigValueFilePath += driveLetterSplit[1];
 
 					realBigValueFilePath  = realBigValueFilePath.replace("\\", "/");
-					carla_stdout("big value save path AFTER => %s", realBigValueFilePath.toRawUTF8());
+					blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] big value save path AFTER => %s", realBigValueFilePath.toRawUTF8());
 				}
 				#endif
 
@@ -1017,7 +1015,7 @@ void carla_bridge::readMessages()
 			if (fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
 			{
 				const StringArray driveLetterSplit(StringArray::fromTokens(realChunkFilePath, ":/", ""));
-				carla_stdout("chunk save path BEFORE => %s", realChunkFilePath.toRawUTF8());
+				blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] chunk save path BEFORE => %s", realChunkFilePath.toRawUTF8());
 
 				realChunkFilePath  = fWinePrefix;
 				realChunkFilePath += "/drive_";
@@ -1025,7 +1023,7 @@ void carla_bridge::readMessages()
 				realChunkFilePath += driveLetterSplit[1];
 
 				realChunkFilePath  = realChunkFilePath.replace("\\", "/");
-				carla_stdout("chunk save path AFTER => %s", realChunkFilePath.toRawUTF8());
+				blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] chunk save path AFTER => %s", realChunkFilePath.toRawUTF8());
 			}
 			#endif
 
