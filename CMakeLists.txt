@@ -104,74 +104,78 @@ set_target_properties_obs(
              FOLDER plugins
              PREFIX "")
 
-# Setup carla-patchbay target
-add_library(carla-patchbay MODULE)
-add_library(OBS::carla-patchbay ALIAS carla-patchbay)
+# Setup carla-patchbay target (not available on Windows for now)
+if(NOT OS_WINDOWS)
 
-target_compile_definitions(
-  carla-patchbay
-  PRIVATE BUILDING_CARLA
-          CARLA_BACKEND_NAMESPACE=CarlaPatchbayOBS
-          CARLA_MODULE_ID="carla_patchbay"
-          CARLA_MODULE_NAME="Carla Patchbay"
-          CARLA_PLUGIN_BUILD
-          CARLA_PLUGIN_ONLY_BRIDGE
-          STATIC_PLUGIN_TARGET
-          $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
-          $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
+  add_library(carla-patchbay MODULE)
+  add_library(OBS::carla-patchbay ALIAS carla-patchbay)
 
-if(NOT MSVC)
-  target_compile_options(carla-patchbay PRIVATE -Wno-vla)
+  target_compile_definitions(
+    carla-patchbay
+    PRIVATE BUILDING_CARLA
+            CARLA_BACKEND_NAMESPACE=CarlaPatchbayOBS
+            CARLA_MODULE_ID="carla_patchbay"
+            CARLA_MODULE_NAME="Carla Patchbay"
+            CARLA_PLUGIN_BUILD
+            CARLA_PLUGIN_ONLY_BRIDGE
+            STATIC_PLUGIN_TARGET
+            $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
+            $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
+
+  if(NOT MSVC)
+    target_compile_options(carla-patchbay PRIVATE -Wno-vla)
+  endif()
+
+  target_include_directories(
+    carla-patchbay
+    PRIVATE carla/source
+            carla/source/backend
+            carla/source/includes
+            carla/source/modules
+            carla/source/utils
+            ${LIBMAGIC_INCLUDE_DIRS}
+            ${X11_INCLUDE_DIRS})
+
+  target_link_directories(carla-patchbay PRIVATE ${LIBMAGIC_LIBRARY_DIRS})
+
+  target_link_libraries(
+    carla-patchbay
+    PRIVATE carla::jackbridge
+            carla::rtmempool
+            carla::water
+            OBS::libobs
+            OBS::frontend-api
+            Qt::Core
+            Qt::Widgets
+            ${LIBMAGIC_LIBRARIES}
+            ${X11_LIBRARIES})
+
+  if(NOT (OS_MACOS OR OS_WINDOWS))
+    target_link_options(carla-patchbay PRIVATE -Wl,--no-undefined)
+  endif()
+
+  target_sources(
+    carla-patchbay
+    PRIVATE carla.c
+            carla-patchbay-wrapper.c
+            common.c
+            qtutils.cpp
+            carla/source/backend/engine/CarlaEngine.cpp
+            carla/source/backend/engine/CarlaEngineClient.cpp
+            carla/source/backend/engine/CarlaEngineData.cpp
+            carla/source/backend/engine/CarlaEngineGraph.cpp
+            carla/source/backend/engine/CarlaEngineInternal.cpp
+            carla/source/backend/engine/CarlaEngineNative.cpp
+            carla/source/backend/engine/CarlaEnginePorts.cpp
+            carla/source/backend/engine/CarlaEngineRunner.cpp
+            carla/source/backend/plugin/CarlaPlugin.cpp
+            carla/source/backend/plugin/CarlaPluginBridge.cpp
+            carla/source/backend/plugin/CarlaPluginInternal.cpp)
+
+  if(OS_MACOS)
+    set_source_files_properties(carla/source/backend/engine/CarlaEngineNative.cpp PROPERTIES COMPILE_FLAGS -ObjC++)
+  endif()
+
+  set_target_properties_obs(carla-patchbay PROPERTIES FOLDER plugins PREFIX "")
+
 endif()
-
-target_include_directories(
-  carla-patchbay
-  PRIVATE carla/source
-          carla/source/backend
-          carla/source/includes
-          carla/source/modules
-          carla/source/utils
-          ${LIBMAGIC_INCLUDE_DIRS}
-          ${X11_INCLUDE_DIRS})
-
-target_link_directories(carla-patchbay PRIVATE ${LIBMAGIC_LIBRARY_DIRS})
-
-target_link_libraries(
-  carla-patchbay
-  PRIVATE carla::jackbridge
-          carla::rtmempool
-          carla::water
-          OBS::libobs
-          OBS::frontend-api
-          Qt::Core
-          Qt::Widgets
-          ${LIBMAGIC_LIBRARIES}
-          ${X11_LIBRARIES})
-
-if(NOT (OS_MACOS OR OS_WINDOWS))
-  target_link_options(carla-patchbay PRIVATE -Wl,--no-undefined)
-endif()
-
-target_sources(
-  carla-patchbay
-  PRIVATE carla.c
-          carla-patchbay-wrapper.c
-          common.c
-          qtutils.cpp
-          carla/source/backend/engine/CarlaEngine.cpp
-          carla/source/backend/engine/CarlaEngineClient.cpp
-          carla/source/backend/engine/CarlaEngineData.cpp
-          carla/source/backend/engine/CarlaEngineGraph.cpp
-          carla/source/backend/engine/CarlaEngineInternal.cpp
-          carla/source/backend/engine/CarlaEngineNative.cpp
-          carla/source/backend/engine/CarlaEnginePorts.cpp
-          carla/source/backend/engine/CarlaEngineRunner.cpp
-          carla/source/backend/plugin/CarlaPlugin.cpp
-          carla/source/backend/plugin/CarlaPluginBridge.cpp
-          carla/source/backend/plugin/CarlaPluginInternal.cpp)
-
-if(OS_MACOS)
-  set_source_files_properties(carla/source/backend/engine/CarlaEngineNative.cpp PROPERTIES COMPILE_FLAGS -ObjC++)
-endif()
-
-set_target_properties_obs(carla-patchbay PROPERTIES FOLDER plugins PREFIX "")
