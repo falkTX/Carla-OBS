@@ -126,7 +126,7 @@ static void host_ui_parameter_changed(NativeHostHandle handle, uint32_t index,
 	/**/ if (hints & NATIVE_PARAMETER_IS_BOOLEAN)
 		obs_data_set_bool(settings, pname, value > 0.5f ? 1.f : 0.f);
 	else if (hints & NATIVE_PARAMETER_IS_INTEGER)
-		obs_data_set_int(settings, pname, value);
+		obs_data_set_int(settings, pname, (int)value);
 	else
 		obs_data_set_double(settings, pname, value);
 
@@ -391,14 +391,14 @@ static bool carla_priv_param_changed(void *data, obs_properties_t *props,
 		value = obs_data_get_bool(settings, pname) ? max : min;
 		break;
 	case OBS_PROPERTY_INT:
-		value = obs_data_get_int(settings, pname);
+		value = (float)obs_data_get_int(settings, pname);
 		if (value < min)
 			value = min;
 		else if (value > max)
 			value = max;
 		break;
 	case OBS_PROPERTY_FLOAT:
-		value = obs_data_get_double(settings, pname);
+		value = (float)obs_data_get_double(settings, pname);
 		if (value < min)
 			value = min;
 		else if (value > max)
@@ -477,18 +477,19 @@ void carla_priv_readd_properties(struct carla_priv *priv,
 							  info->ranges.max);
 		} else if (info->hints & NATIVE_PARAMETER_IS_INTEGER) {
 			prop = obs_properties_add_int_slider(
-				props, pname, info->name, info->ranges.min,
-				info->ranges.max, info->ranges.step);
+				props, pname, info->name,
+				(int)info->ranges.min, (int)info->ranges.max,
+				(int)info->ranges.step);
 
 			obs_data_set_default_int(settings, pname,
-						 info->ranges.def);
+						 (int)info->ranges.def);
 
 			if (info->unit && *info->unit)
 				obs_property_int_set_suffix(prop, info->unit);
 
 			if (reset)
 				obs_data_set_int(settings, pname,
-						 info->ranges.def);
+						 (int)info->ranges.def);
 		} else {
 			prop = obs_properties_add_float_slider(
 				props, pname, info->name, info->ranges.min,
@@ -522,6 +523,7 @@ bool carla_priv_show_gui_callback(obs_properties_t *props,
 
 	struct carla_priv *priv = data;
 
+	// FIXME check if needed, frontend already sets these?
 	char winIdStr[24];
 	snprintf(winIdStr, sizeof(winIdStr), "%llx",
 		 (ulonglong)carla_qt_get_main_window_id());
@@ -534,7 +536,7 @@ bool carla_priv_show_gui_callback(obs_properties_t *props,
 	priv->descriptor->dispatcher(priv->handle,
 				     NATIVE_PLUGIN_OPCODE_HOST_OPTION,
 				     ENGINE_OPTION_FRONTEND_UI_SCALE,
-				     scaleFactor * 1000, NULL, 0.f);
+				     (intptr_t)(scaleFactor * 1000), NULL, 0.f);
 
 	priv->descriptor->ui_show(priv->handle, true);
 
