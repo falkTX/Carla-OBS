@@ -117,7 +117,6 @@ target_compile_definitions(
           CARLA_PLUGIN_BUILD
           CARLA_PLUGIN_ONLY_BRIDGE
           STATIC_PLUGIN_TARGET
-          REAL_BUILD
           $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
           $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
 
