@@ -79,6 +79,9 @@ struct carla_priv *carla_priv_create(obs_source_t *source,
 	if (priv->bufferSize == 0)
 		goto fail1;
 
+	// FIXME?
+	priv->bridge.activate();
+
 	return priv;
 
 fail1:
@@ -130,13 +133,47 @@ void carla_priv_save(struct carla_priv *priv, obs_data_t *settings)
 	obs_data_set_string(settings, "filename", priv->bridge.info.filename);
 	obs_data_set_string(settings, "label", priv->bridge.info.label);
 
-	if (priv->bridge.info.hints & PLUGIN_OPTION_USE_CHUNKS) {
-		char *b64ptr = CarlaString::asBase64(priv->bridge.info.chunk.data(),
-						     priv->bridge.info.chunk.size()).releaseBufferPointer();
+	if (!priv->bridge.customData.empty())
+	{
+		obs_data_array_t *array = obs_data_array_create();
+
+		for (CustomData& cdata : priv->bridge.customData)
+		{
+			obs_data_t *data = obs_data_create();
+			obs_data_set_string(data, "type", cdata.type);
+			obs_data_set_string(data, "key", cdata.key);
+			obs_data_set_string(data, "value", cdata.value);
+			obs_data_array_push_back(array, data);
+			obs_data_release(data);
+		}
+
+		obs_data_set_array(settings, PROP_CUSTOM_DATA, array);
+		obs_data_array_release(array);
+	}
+	else
+	{
+		obs_data_erase(settings, PROP_CUSTOM_DATA);
+	}
+
+	char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
+
+	if ((priv->bridge.info.options & PLUGIN_OPTION_USE_CHUNKS) && !priv->bridge.chunk.isEmpty()) {
+		char *b64ptr = CarlaString::asBase64(priv->bridge.chunk.data(),
+						     priv->bridge.chunk.size()).releaseBufferPointer();
 		const CarlaString b64chunk(b64ptr, false);
-		obs_data_set_string(settings, "chunk", b64chunk.buffer());
+		obs_data_set_string(settings, PROP_CHUNK, b64chunk.buffer());
+
+		for (uint32_t i = 0; i < priv->bridge.paramCount; ++i) {
+			const carla_param_data &param(priv->bridge.paramDetails[i]);
+
+			if ((param.hints & PARAMETER_IS_ENABLED) == 0)
+				continue;
+
+			param_index_to_name(i, pname);
+			obs_data_erase(settings, pname);
+		}
 	} else {
-		char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
+		obs_data_erase(settings, PROP_CHUNK);
 
 		for (uint32_t i = 0; i < priv->bridge.paramCount; ++i) {
 			const carla_param_data &param(priv->bridge.paramDetails[i]);
@@ -169,37 +206,60 @@ void carla_priv_load(struct carla_priv *priv, obs_data_t *settings)
 	priv->bridge.cleanup();
 	priv->bridge.init(priv->bufferSize, priv->sampleRate);
 
-	// TODO show error message if bridge fails
-	priv->bridge.start(getPluginTypeFromString(type), "x86_64",
-			   "/usr/lib/carla/carla-bridge-native", label,
-			   filename, uniqueId);
+	if (!priv->bridge.start(getPluginTypeFromString(type), "x86_64",
+				"/usr/lib/carla/carla-bridge-native", label,
+				filename, uniqueId))
+	{
+		// TODO show error message if bridge fails
+		return;
+	}
 
-	if (priv->bridge.info.hints & PLUGIN_OPTION_USE_CHUNKS) {
-		const char *b64chunk = obs_data_get_string(settings, "chunk");
+	obs_data_array_t *array = obs_data_get_array(settings, PROP_CUSTOM_DATA);
+	if (array)
+	{
+		const size_t count = obs_data_array_count(array);
+		for (size_t i = 0; i < count; ++i)
+		{
+			obs_data_t *data = obs_data_array_item(array, i);
+			const char *type = obs_data_get_string(data, "type");
+			const char *key = obs_data_get_string(data, "key");
+			const char *value = obs_data_get_string(data, "value");
+			carla_stdout("sending custom data with values:\n%s\n%s\n%s", type, key, value);
+			priv->bridge.add_custom_data(type, key, value, true);
+		}
+		priv->bridge.custom_data_loaded();
+	}
+
+	if (priv->bridge.info.options & PLUGIN_OPTION_USE_CHUNKS) {
+		const char *b64chunk = obs_data_get_string(settings, PROP_CHUNK);
 		priv->bridge.load_chunk(b64chunk);
 	}
 	else {
-		char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
-
 		for (uint32_t i = 0; i < priv->bridge.paramCount; ++i) {
 			const carla_param_data &param(priv->bridge.paramDetails[i]);
 
-			if ((param.hints & PARAMETER_IS_ENABLED) == 0)
-				continue;
-
-			param_index_to_name(i, pname);
-
-			if (param.hints & PARAMETER_IS_BOOLEAN) {
-				obs_data_set_bool(settings, pname,
-						carla_isEqual(param.value,
-								param.max));
-			} else if (param.hints & PARAMETER_IS_INTEGER) {
-				obs_data_set_int(settings, pname, param.value);
-			} else {
-				obs_data_set_double(settings, pname, param.value);
-			}
-
 			priv->bridge.set_value(i, param.value);
+		}
+	}
+
+	char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
+
+	for (uint32_t i = 0; i < priv->bridge.paramCount; ++i) {
+		const carla_param_data &param(priv->bridge.paramDetails[i]);
+
+		if ((param.hints & PARAMETER_IS_ENABLED) == 0)
+			continue;
+
+		param_index_to_name(i, pname);
+
+		if (param.hints & PARAMETER_IS_BOOLEAN) {
+			obs_data_set_bool(settings, pname,
+					carla_isEqual(param.value,
+							param.max));
+		} else if (param.hints & PARAMETER_IS_INTEGER) {
+			obs_data_set_int(settings, pname, param.value);
+		} else {
+			obs_data_set_double(settings, pname, param.value);
 		}
 	}
 }

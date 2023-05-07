@@ -65,13 +65,20 @@ void param_index_to_name(uint32_t index, char name[PARAM_NAME_SIZE])
 
 void remove_all_props(obs_properties_t *props, obs_data_t *settings)
 {
-	obs_data_unset_default_value(settings, PROP_SHOW_GUI);
+	obs_data_erase(settings, PROP_SHOW_GUI);
 	obs_properties_remove_by_name(props, PROP_SHOW_GUI);
+
+	obs_data_erase(settings, PROP_CHUNK);
+	obs_properties_remove_by_name(props, PROP_CHUNK);
+
+	obs_data_erase(settings, PROP_CUSTOM_DATA);
+	obs_properties_remove_by_name(props, PROP_CUSTOM_DATA);
 
 	char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
 
 	for (uint32_t i = 0; i < MAX_PARAMS; ++i) {
 		param_index_to_name(i, pname);
+		obs_data_erase(settings, pname);
 		obs_data_unset_default_value(settings, pname);
 		obs_properties_remove_by_name(props, pname);
 	}

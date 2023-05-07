@@ -9,10 +9,10 @@
 #include "CarlaBackend.h"
 #include "CarlaBridgeUtils.hpp"
 
-#include <memory>
-#include <vector>
-
+#include <QtCore/QByteArray>
 #include <QtCore/QProcess>
+
+#include <vector>
 
 // generates warning if defined as anything else
 #define MAX_AV_PLANES 8
@@ -43,7 +43,6 @@ struct carla_bridge_info {
 	CarlaString filename;
 	CarlaString label;
 	int64_t uniqueId = 0;
-	std::vector<uint8_t> chunk;
 
 	void clear()
 	{
@@ -54,7 +53,6 @@ struct carla_bridge_info {
 		uniqueId = 0;
 		label.clear();
 		filename.clear();
-		chunk.clear();
 	}
 };
 
@@ -72,8 +70,14 @@ struct carla_bridge {
 
 	// cached plugin info
 	carla_bridge_info info;
+	QByteArray chunk;
+	std::vector<CustomData> customData;
 
-	~carla_bridge() { delete[] paramDetails; }
+	~carla_bridge()
+	{
+		delete[] paramDetails;
+		clear_custom_data();
+	}
 
 	bool init(uint32_t maxBufferSize, double sampleRate);
 	void cleanup();
@@ -96,6 +100,10 @@ struct carla_bridge {
 	void deactivate();
 	void process(float *buffers[MAX_AV_PLANES], uint32_t frames);
 
+	void add_custom_data(const char *type, const char *key, const char *value, bool sendToPlugin);
+	void custom_data_loaded();
+	void clear_custom_data();
+
 	void load_chunk(const char *b64chunk);
 	void save_and_wait();
 
@@ -112,7 +120,7 @@ private:
 	BridgeNonRtClientControl nonRtClientCtrl; // fShmNonRtClientControl
 	BridgeNonRtServerControl nonRtServerCtrl; // fShmNonRtServerControl
 
-	std::unique_ptr<QProcess> childprocess;
+	QProcess *childprocess = nullptr;
 
 	void readMessages();
 };

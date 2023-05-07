@@ -246,7 +246,7 @@ static void carla_obs_filter_audio_direct(struct carla_data *carla,
 	float *obsbuffers[MAX_AV_PLANES];
 
 	for (uint32_t i = 0; i < frames;) {
-		const uint32_t stepframes = frames <= MAX_AUDIO_BUFFER_SIZE
+		const uint32_t stepframes = frames >= MAX_AUDIO_BUFFER_SIZE
 			? MAX_AUDIO_BUFFER_SIZE
 			: frames;
 

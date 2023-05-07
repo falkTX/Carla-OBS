@@ -21,6 +21,9 @@
 #define PROP_SELECT_PLUGIN "select-plugin"
 #define PROP_SHOW_GUI "show-gui"
 
+#define PROP_CHUNK "chunk"
+#define PROP_CUSTOM_DATA "customdata"
+
 // ----------------------------------------------------------------------------
 
 #ifdef __cplusplus
