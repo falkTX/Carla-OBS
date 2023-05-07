@@ -28,6 +28,7 @@
 
 // ----------------------------------------------------------------------------
 
+#ifndef _WIN32
 static const struct {
 	const char *bin;
 	const char *res;
@@ -36,11 +37,10 @@ static const struct {
 	{ "~/Applications/Carla.app/Contents/MacOS", "~/Applications/Carla.app/Contents/MacOS/resources" },
 	{ "/Applications/Carla.app/Contents/MacOS", "/Applications/Carla.app/Contents/MacOS/resources" },
 #endif
-#ifndef _WIN32
 	{ "/usr/local/lib/carla", "/usr/local/share/carla/resources" },
 	{ "/usr/lib/carla", "/usr/share/carla/resources" },
-#endif
 };
+#endif
 
 static char* module_path = NULL;
 static const char* resource_path = NULL;
@@ -81,6 +81,7 @@ free:
 	module_path = NULL;
 
 fail:
+#ifndef _WIN32
 	for (size_t i = 0; i < sizeof(carla_system_paths)/sizeof(carla_system_paths[0]); ++i) {
 		if (os_file_exists(carla_system_paths[i].bin)) {
 			/* NOTE we are intentionally not using bstrdup,
@@ -91,6 +92,7 @@ fail:
 			break;
 		}
 	}
+#endif
 
 	return module_path;
 }
@@ -100,12 +102,14 @@ const char *get_carla_resource_path(void)
 	if (resource_path != NULL)
 		return resource_path;
 
+#ifndef _WIN32
 	for (size_t i = 0; i < sizeof(carla_system_paths)/sizeof(carla_system_paths[0]); ++i) {
 		if (os_file_exists(carla_system_paths[i].res)) {
 			resource_path = carla_system_paths[i].res;
 			break;
 		}
 	}
+#endif
 
 	return resource_path;
 }
