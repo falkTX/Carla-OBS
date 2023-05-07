@@ -148,7 +148,7 @@ target_link_libraries(
           ${LIBMAGIC_LIBRARIES}
           ${X11_LIBRARIES})
 
-if(NOT OS_MACOS)
+if(NOT (OS_MACOS OR OS_WINDOWS))
   target_link_options(carla-patchbay PRIVATE -Wl,--no-undefined)
 endif()
 

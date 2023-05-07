@@ -67,8 +67,6 @@ void carla_priv_readd_properties(struct carla_priv *carla,
 bool carla_priv_show_gui_callback(obs_properties_t *props,
 				  obs_property_t *property, void *data);
 
-void carla_priv_free(void *data);
-
 #ifdef __cplusplus
 }
 #endif
