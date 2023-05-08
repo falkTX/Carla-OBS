@@ -20,12 +20,6 @@
 // generates a warning if this is defined as anything else
 #define CARLA_API
 
-#ifdef CARLA_OS_WIN
-# define APP_EXT ".exe"
-#else
-# define APP_EXT ""
-#endif
-
 // ----------------------------------------------------------------------------
 // private data methods
 

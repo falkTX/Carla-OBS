@@ -13,6 +13,11 @@
 
 #include "CarlaBackendUtils.hpp"
 #include "CarlaBase64Utils.hpp"
+#include "CarlaBinaryUtils.hpp"
+
+#ifdef CARLA_OS_MAC
+#include "CarlaMacUtils.hpp"
+#endif
 
 #include <ctime>
 
@@ -21,10 +26,6 @@
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
 #include <QtWidgets/QMessageBox>
-
-#ifdef CARLA_OS_MAC
-#include "CarlaMacUtils.hpp"
-#endif
 
 // ----------------------------------------------------------------------------
 
@@ -318,19 +319,20 @@ bool carla_bridge::start(const BinaryType btype,
 	{
 		const char* needsArchBridge = nullptr;
 
+		#ifdef HAVE_LIBMAGIC
 		if (const char* const vstBinary = findBinaryInBundle(filename))
 		{
 			const CarlaMagic magic;
 			if (const char* const output = magic.getFileDescription(vstBinary))
 			{
 				blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] VST binary magic output is '%s'", output);
-#ifdef __aarch64__
+				#ifdef __aarch64__
 				if (std::strstr(output, "arm64") == nullptr && std::strstr(output, "x86_64") != nullptr)
 					needsArchBridge = "x86_64";
-#else
+				#else
 				if (std::strstr(output, "x86_64") == nullptr && std::strstr(output, "arm64") != nullptr)
 					needsArchBridge = "arm64";
-#endif
+				#endif
 			}
 			else
 			{
@@ -341,6 +343,7 @@ bool carla_bridge::start(const BinaryType btype,
 		{
 			blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] Search for binary in VST bundle failed");
 		}
+		#endif
 
 		if (needsArchBridge)
 		{
