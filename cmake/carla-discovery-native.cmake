@@ -3,9 +3,10 @@ mark_as_advanced(carla-discovery-native)
 
 # TODO HAVE_FLUIDSYNTH HAVE_YSFX
 
-# target_compile_definitions(carla-discovery-native PRIVATE HAVE_YSFX)
+target_compile_definitions(carla-discovery-native PRIVATE CARLA_BACKEND_NAMESPACE=CarlaOBS)
 
-target_compile_options(carla-discovery-native PRIVATE $<$<BOOL:${OS_MACOS}>:-ObjC++> $<$<NOT:$<BOOL:${MSVC}>>:-Wno-vla>)
+target_compile_options(carla-discovery-native PRIVATE $<$<BOOL:${MSVC}>:/wd4267> $<$<BOOL:${OS_MACOS}>:-ObjC++>
+                                                      $<$<NOT:$<BOOL:${MSVC}>>:-Wno-deprecated-copy -Wno-vla>)
 
 target_include_directories(carla-discovery-native PRIVATE carla/source/backend carla/source/includes
                                                           carla/source/modules carla/source/utils)

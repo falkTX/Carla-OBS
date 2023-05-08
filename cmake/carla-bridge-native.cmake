@@ -5,8 +5,13 @@ mark_as_advanced(carla-bridge-native)
 
 target_compile_definitions(
   carla-bridge-native
-  PRIVATE BUILDING_CARLA BUILD_BRIDGE BUILD_BRIDGE_ALTERNATIVE_ARCH CARLA_LIB_EXT="${CMAKE_SHARED_LIBRARY_SUFFIX}"
-          $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC> $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
+  PRIVATE BUILDING_CARLA
+          BUILD_BRIDGE
+          BUILD_BRIDGE_ALTERNATIVE_ARCH
+          CARLA_BACKEND_NAMESPACE=CarlaOBS
+          CARLA_LIB_EXT="${CMAKE_SHARED_LIBRARY_SUFFIX}"
+          $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
+          $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
 
 target_compile_options(
   carla-bridge-native PRIVATE $<$<BOOL:${OS_MACOS}>:-ObjC++> $<$<NOT:$<BOOL:${MSVC}>>:-Wno-format-truncation
@@ -41,7 +46,6 @@ target_sources(
           carla/source/backend/engine/CarlaEngineRunner.cpp
           carla/source/backend/plugin/CarlaPlugin.cpp
           carla/source/backend/plugin/CarlaPluginBridge.cpp
-          carla/source/backend/plugin/CarlaPluginJuce.cpp
           carla/source/backend/plugin/CarlaPluginInternal.cpp
           carla/source/backend/plugin/CarlaPluginAU.cpp
           carla/source/backend/plugin/CarlaPluginCLAP.cpp
