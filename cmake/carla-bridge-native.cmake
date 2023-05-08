@@ -42,6 +42,7 @@ target_sources(
           carla/source/backend/engine/CarlaEngineRunner.cpp
           carla/source/backend/plugin/CarlaPlugin.cpp
           carla/source/backend/plugin/CarlaPluginBridge.cpp
+          carla/source/backend/plugin/CarlaPluginJuce.cpp
           carla/source/backend/plugin/CarlaPluginInternal.cpp
           carla/source/backend/plugin/CarlaPluginAU.cpp
           carla/source/backend/plugin/CarlaPluginCLAP.cpp
