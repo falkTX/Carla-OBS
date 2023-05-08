@@ -41,7 +41,7 @@ endif()
 
 target_include_directories(carla-water PRIVATE carla/source/includes carla/source/utils)
 
-target_link_libraries(carla-water PRIVATE ${carla_water_extra_libs})
+target_link_libraries(carla-water PUBLIC ${carla_water_extra_libs})
 
 if(OS_MACOS)
   target_sources(carla-water PRIVATE ${carla_water_basedir}/water.obs.mm)

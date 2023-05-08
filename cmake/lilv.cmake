@@ -16,7 +16,10 @@ set(carla_lilv_basedir carla/source/modules/lilv)
 
 set(carla_lilv_include_directories carla/source/includes ${carla_lilv_basedir}/config)
 
-if(NOT (OS_MACOS OR OS_WINDOWS))
+if(NOT
+   (OS_FREEBSD
+    OR OS_MACOS
+    OR OS_WINDOWS))
   set(carla_lilv_extra_libs dl m rt)
 endif()
 

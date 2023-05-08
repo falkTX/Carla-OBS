@@ -66,8 +66,7 @@ target_compile_definitions(
           CARLA_MODULE_NAME="Carla Bridge"
           CARLA_PLUGIN_ONLY_BRIDGE
           STATIC_PLUGIN_TARGET
-          $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
-          $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
+          $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>)
 
 target_include_directories(
   carla-bridge
@@ -138,10 +137,6 @@ if(NOT OS_WINDOWS)
             STATIC_PLUGIN_TARGET
             $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
             $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
-
-  if(NOT MSVC)
-    target_compile_options(carla-patchbay PRIVATE -Wno-error=vla)
-  endif()
 
   target_include_directories(
     carla-patchbay
