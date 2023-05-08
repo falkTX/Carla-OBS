@@ -311,8 +311,10 @@ bool carla_bridge::start(const BinaryType btype,
 
 #ifdef CARLA_OS_MAC
 	// Plugin might be in quarentine due to Apple stupid notarization rules, let's remove that if possible
+	/*
 	if (ptype != PLUGIN_INTERNAL && ptype != PLUGIN_LV2 && ptype != PLUGIN_AU)
 		removeFileFromQuarantine(filename);
+	*/
 
 	// see if this binary needs special help
 	if (ptype == PLUGIN_VST2 || ptype == PLUGIN_VST3)
