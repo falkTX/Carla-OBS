@@ -356,8 +356,6 @@ static bool carla_priv_select_plugin_callback(obs_properties_t *props,
 	priv->bridge.cleanup();
 	priv->bridge.init(priv->bufferSize, priv->sampleRate);
 
-	const CarlaString binPath(get_carla_bin_path());
-
 	// TODO show error message if bridge fails
 	priv->bridge.start((BinaryType)plugin->build,
 			   (PluginType)plugin->type,

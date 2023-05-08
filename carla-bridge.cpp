@@ -14,10 +14,6 @@
 #include "CarlaBackendUtils.hpp"
 #include "CarlaBase64Utils.hpp"
 
-// #include "water/files/File.h"
-// #include "water/misc/Time.h"
-// #include "water/streams/MemoryOutputStream.h"
-
 #include <ctime>
 
 #include <QtCore/QCoreApplication>
@@ -26,12 +22,16 @@
 #include <QtCore/QFileInfo>
 #include <QtWidgets/QMessageBox>
 
+#ifdef CARLA_OS_MAC
+#include "CarlaMacUtils.hpp"
+#endif
+
 // ----------------------------------------------------------------------------
 
 #ifndef CARLA_OS_WIN
 static QString findWinePrefix(const QString filename, const int recursionLimit = 10)
 {
-    if (recursionLimit == 0 || filename.length() < 5 || ! filename.contains('/'))
+    if (recursionLimit == 0 || filename.length() < 5)
         return {};
 
     const int lastSep = filename.lastIndexOf('/');
@@ -436,6 +436,7 @@ bool carla_bridge::start(const BinaryType btype,
 		nonRtClientCtrl.commitWrite();
 	}
 
+	info.btype = btype;
 	info.ptype = ptype;
 	info.filename = filename;
 	info.label = label;
@@ -1087,20 +1088,20 @@ void carla_bridge::readMessages()
 
 				QString realBigValueFilePath(QString::fromUtf8(bigValueFilePath.text));
 
-				#if 0 // ndef CARLA_OS_WIN
+				#ifndef CARLA_OS_WIN
 				// Using Wine, fix temp dir
-				if (fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
+				if (info.btype == BINARY_WIN32 || info.btype == BINARY_WIN64)
 				{
-					const StringArray driveLetterSplit(StringArray::fromTokens(realBigValueFilePath, ":/", ""));
-					blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] big value save path BEFORE => %s", realBigValueFilePath.toRawUTF8());
+					const QStringList driveLetterSplit(realBigValueFilePath.split(':'));
+					blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] big value save path BEFORE => %s", realBigValueFilePath.toUtf8().constData());
 
-					realBigValueFilePath  = fWinePrefix;
+					realBigValueFilePath  = winePrefix;
 					realBigValueFilePath += "/drive_";
-					realBigValueFilePath += driveLetterSplit[0].toLowerCase();
+					realBigValueFilePath += driveLetterSplit[0].toLower();
 					realBigValueFilePath += driveLetterSplit[1];
 
-					realBigValueFilePath  = realBigValueFilePath.replace("\\", "/");
-					blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] big value save path AFTER => %s", realBigValueFilePath.toRawUTF8());
+					realBigValueFilePath  = realBigValueFilePath.replace('\\', '/');
+					blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] big value save path AFTER => %s", realBigValueFilePath.toUtf8().constData());
 				}
 				#endif
 
@@ -1129,20 +1130,20 @@ void carla_bridge::readMessages()
 
 			QString realChunkFilePath(QString::fromUtf8(chunkFilePath.text));
 
-			#if 0 // ndef CARLA_OS_WIN
+			#ifndef CARLA_OS_WIN
 			// Using Wine, fix temp dir
-			if (fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
+			if (info.btype == BINARY_WIN32 || info.btype == BINARY_WIN64)
 			{
-				const StringArray driveLetterSplit(StringArray::fromTokens(realChunkFilePath, ":/", ""));
-				blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] chunk save path BEFORE => %s", realChunkFilePath.toRawUTF8());
+				const QStringList driveLetterSplit(realChunkFilePath.split(':'));
+				blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] chunk save path BEFORE => %s", realChunkFilePath.toUtf8().constData());
 
-				realChunkFilePath  = fWinePrefix;
+				realChunkFilePath  = winePrefix;
 				realChunkFilePath += "/drive_";
-				realChunkFilePath += driveLetterSplit[0].toLowerCase();
+				realChunkFilePath += driveLetterSplit[0].toLower();
 				realChunkFilePath += driveLetterSplit[1];
 
-				realChunkFilePath  = realChunkFilePath.replace("\\", "/");
-				blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] chunk save path AFTER => %s", realChunkFilePath.toRawUTF8());
+				realChunkFilePath  = realChunkFilePath.replace('\\', '/');
+				blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] chunk save path AFTER => %s", realChunkFilePath.toUtf8().constData());
 			}
 			#endif
 

@@ -87,7 +87,12 @@ target_sources(
           carla/source/frontend/carla_frontend.cpp
           carla/source/frontend/pluginlist/pluginlistdialog.cpp
           carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
-          carla/source/utils/CarlaBridgeUtils.cpp)
+          carla/source/utils/CarlaBridgeUtils.cpp
+          carla/source/utils/CarlaMacUtils.cpp)
+
+if(OS_MACOS)
+  set_source_files_properties(carla/source/utils/CarlaMacUtils.cpp PROPERTIES COMPILE_FLAGS -ObjC++)
+endif()
 
 if(OS_WINDOWS)
   set_property(
