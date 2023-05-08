@@ -168,7 +168,7 @@ void carla_priv_save(struct carla_priv *priv, obs_data_t *settings)
 		const CarlaString b64chunk(b64ptr, false);
 		obs_data_set_string(settings, PROP_CHUNK, b64chunk.buffer());
 
-		for (uint32_t i = 0; i < priv->bridge.paramCount; ++i) {
+		for (uint32_t i = 0; i < priv->bridge.paramCount && i < MAX_PARAMS; ++i) {
 			const carla_param_data &param(priv->bridge.paramDetails[i]);
 
 			if ((param.hints & PARAMETER_IS_ENABLED) == 0)
@@ -180,7 +180,7 @@ void carla_priv_save(struct carla_priv *priv, obs_data_t *settings)
 	} else {
 		obs_data_erase(settings, PROP_CHUNK);
 
-		for (uint32_t i = 0; i < priv->bridge.paramCount; ++i) {
+		for (uint32_t i = 0; i < priv->bridge.paramCount && i < MAX_PARAMS; ++i) {
 			const carla_param_data &param(priv->bridge.paramDetails[i]);
 
 			if ((param.hints & PARAMETER_IS_ENABLED) == 0)
@@ -249,7 +249,7 @@ void carla_priv_load(struct carla_priv *priv, obs_data_t *settings)
 
 	char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
 
-	for (uint32_t i = 0; i < priv->bridge.paramCount; ++i) {
+	for (uint32_t i = 0; i < priv->bridge.paramCount && i < MAX_PARAMS; ++i) {
 		const carla_param_data &param(priv->bridge.paramDetails[i]);
 
 		if ((param.hints & PARAMETER_IS_ENABLED) == 0)
@@ -456,7 +456,7 @@ void carla_priv_readd_properties(struct carla_priv *priv,
 
 	char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
 
-	for (uint32_t i = 0; i < priv->bridge.paramCount; ++i) {
+	for (uint32_t i = 0; i < priv->bridge.paramCount && i < MAX_PARAMS; ++i) {
 		const carla_param_data &param(priv->bridge.paramDetails[i]);
 
 		if ((param.hints & PARAMETER_IS_ENABLED) == 0)
