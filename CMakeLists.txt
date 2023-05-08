@@ -132,7 +132,7 @@ if(NOT OS_WINDOWS)
             $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
 
   if(NOT MSVC)
-    target_compile_options(carla-patchbay PRIVATE -Wno-vla)
+    target_compile_options(carla-patchbay PRIVATE -Wno-error=vla)
   endif()
 
   target_include_directories(

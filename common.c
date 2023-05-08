@@ -95,17 +95,10 @@ const char *get_carla_bin_path(void)
 	if (rpath == NULL)
 		goto fail;
 
-	// find last separator
+	// truncate to last separator
 	char *lastsep = strrchr(rpath, '/');
 	if (lastsep == NULL)
 		goto free;
-
-	// truncate to ".../carla"
-	for (int i = 0; i < 6 /* strlen("/carla") */; i++) {
-		if (*lastsep == '\0')
-			goto free;
-		++lastsep;
-	}
 	*lastsep = '\0';
 
 	if (os_file_exists(rpath)) {

@@ -133,7 +133,7 @@ if(NOT OS_WINDOWS)
             $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
 
   if(NOT MSVC)
-    target_compile_options(carla-patchbay PRIVATE -Wno-vla)
+    target_compile_options(carla-patchbay PRIVATE -Wno-error=vla)
   endif()
 
   target_include_directories(
@@ -186,7 +186,7 @@ if(NOT OS_WINDOWS)
     set_source_files_properties(carla/source/backend/engine/CarlaEngineNative.cpp PROPERTIES COMPILE_FLAGS -ObjC++)
   endif()
 
-  set_target_properties(carla-patchbay PROPERTIES FOLDER plugins)
+  set_target_properties(carla-patchbay PROPERTIES FOLDER plugins PREFIX "")
 
   setup_plugin_target(carla-patchbay)
 

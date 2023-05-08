@@ -53,3 +53,9 @@ target_sources(
           carla/source/backend/plugin/CarlaPluginLV2.cpp
           carla/source/backend/plugin/CarlaPluginVST2.cpp
           carla/source/backend/plugin/CarlaPluginVST3.cpp)
+
+set_target_properties(carla-bridge-native PROPERTIES FOLDER "plugins/carla")
+
+if(NOT OS_MACOS)
+  setup_plugin_target(carla-bridge-native)
+endif()

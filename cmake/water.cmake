@@ -40,7 +40,7 @@ endif()
 if(MSVC)
   target_compile_options(carla-water PRIVATE /wd4267)
 else()
-  target_compile_options(carla-water PRIVATE -Wno-deprecated-copy)
+  target_compile_options(carla-water PRIVATE -Wno-error=deprecated-copy)
 endif()
 
 target_include_directories(carla-water PRIVATE carla/source/includes carla/source/utils)
