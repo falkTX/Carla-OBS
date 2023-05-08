@@ -1,8 +1,6 @@
 add_executable(carla-bridge-native)
 mark_as_advanced(carla-bridge-native)
 
-# TODO HAVE_FLUIDSYNTH HAVE_YSFX
-
 target_compile_definitions(
   carla-bridge-native
   PRIVATE BUILDING_CARLA
@@ -14,8 +12,7 @@ target_compile_definitions(
           $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
 
 target_compile_options(
-  carla-bridge-native PRIVATE $<$<BOOL:${OS_MACOS}>:-ObjC++> $<$<NOT:$<BOOL:${MSVC}>>:-Wno-format-truncation
-                              -Wno-stringop-overflow -Wno-unused-parameter -Wno-vla>)
+  carla-bridge-native PRIVATE $<$<BOOL:${OS_MACOS}>:-ObjC++> $<$<NOT:$<BOOL:${MSVC}>>:-Wno-error>)
 
 target_include_directories(
   carla-bridge-native

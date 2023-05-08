@@ -1,13 +1,11 @@
 add_executable(carla-discovery-native)
 mark_as_advanced(carla-discovery-native)
 
-# TODO HAVE_FLUIDSYNTH HAVE_YSFX
-
 target_compile_definitions(carla-discovery-native PRIVATE CARLA_BACKEND_NAMESPACE=CarlaOBS)
 
 target_compile_options(
   carla-discovery-native PRIVATE $<$<BOOL:${MSVC}>:/wd4267> $<$<BOOL:${OS_MACOS}>:-ObjC++>
-                                 $<$<NOT:$<BOOL:${MSVC}>>:-Wno-error=deprecated-copy -Wno-error=vla>)
+                                 $<$<NOT:$<BOOL:${MSVC}>>:-Wno-error>)
 
 target_include_directories(carla-discovery-native PRIVATE carla/source/backend carla/source/includes
                                                           carla/source/modules carla/source/utils)
