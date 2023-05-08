@@ -1,12 +1,6 @@
 # base config
 set(carla_rtmempool_basedir carla/source/modules/rtmempool)
-
-if(OS_WINDOWS)
-  set(carla_rtmempool_extra_libs OBS::w32-pthreads)
-else()
-  find_package(Threads REQUIRED)
-  set(carla_rtmempool_extra_libs ${CMAKE_THREAD_LIBS_INIT})
-endif()
+set(carla_rtmempool_extra_libs ${carla_pthread_libs})
 
 # static lib
 add_library(carla-rtmempool STATIC)

@@ -1,15 +1,11 @@
 # base config
 set(carla_water_basedir carla/source/modules/water)
-
-if(OS_WINDOWS)
-  set(carla_water_extra_libs OBS::w32-pthreads)
-else()
-  find_package(Threads REQUIRED)
-  set(carla_water_extra_libs ${CMAKE_THREAD_LIBS_INIT})
-endif()
+set(carla_water_extra_libs ${carla_pthread_libs})
 
 if(OS_MACOS)
-  set(carla_water_extra_libs ${carla_jackbridge_extra_libs} "-framework AppKit")
+  find_library(APPKIT AppKit)
+  mark_as_advanced(APPKIT)
+  set(carla_water_extra_libs ${carla_jackbridge_extra_libs} ${APPKIT})
 elseif(OS_WINDOWS)
   set(carla_water_extra_libs
       ${carla_jackbridge_extra_libs}
@@ -25,7 +21,7 @@ elseif(OS_WINDOWS)
       "shlwapi"
       "rpcrt4"
       "winmm")
-else()
+elseif(NOT OS_FREEBSD)
   set(carla_water_extra_libs ${carla_jackbridge_extra_libs} dl rt)
 endif()
 

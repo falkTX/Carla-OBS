@@ -14,6 +14,14 @@ find_qt(COMPONENTS Core Widgets)
 # Use pkg-config to find optional deps
 find_package(PkgConfig)
 
+# Find pthread via cmake
+if(OS_WINDOWS)
+  set(carla_pthread_libs OBS::w32-pthreads)
+else()
+  find_package(Threads REQUIRED)
+  set(carla_pthread_libs ${CMAKE_THREAD_LIBS_INIT})
+endif()
+
 # Optional: finds correct plugin binary type
 if(PKGCONFIG_FOUND AND NOT OS_WINDOWS)
   pkg_check_modules(LIBMAGIC "libmagic")

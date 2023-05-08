@@ -1,12 +1,6 @@
 # base config
 set(carla_jackbridge_basedir carla/source/jackbridge)
-
-if(OS_WINDOWS)
-  set(carla_jackbridge_extra_libs OBS::w32-pthreads)
-else()
-  find_package(Threads REQUIRED)
-  set(carla_jackbridge_extra_libs ${CMAKE_THREAD_LIBS_INIT})
-endif()
+set(carla_jackbridge_extra_libs ${carla_pthread_libs})
 
 if(NOT
    (OS_FREEBSD
