@@ -10,7 +10,11 @@
 #include "qtutils.h"
 #include <util/platform.h>
 
+#include <QtCore/QFileInfo>
+#include <QtCore/QString>
+
 #include "CarlaBackendUtils.hpp"
+#include "CarlaBinaryUtils.hpp"
 #include "CarlaFrontend.h"
 
 // generates a warning if this is defined as anything else
@@ -129,7 +133,8 @@ void carla_priv_save(struct carla_priv *priv, obs_data_t *settings)
 {
 	priv->bridge.save_and_wait();
 
-	obs_data_set_string(settings, "type", getPluginTypeAsString(priv->bridge.info.ptype));
+	obs_data_set_string(settings, "btype", getBinaryTypeAsString(priv->bridge.info.btype));
+	obs_data_set_string(settings, "ptype", getPluginTypeAsString(priv->bridge.info.ptype));
 	obs_data_set_string(settings, "filename", priv->bridge.info.filename);
 	obs_data_set_string(settings, "label", priv->bridge.info.label);
 
@@ -198,7 +203,8 @@ void carla_priv_save(struct carla_priv *priv, obs_data_t *settings)
 
 void carla_priv_load(struct carla_priv *priv, obs_data_t *settings)
 {
-	const char *type = obs_data_get_string(settings, "type");
+	const char *btype = obs_data_get_string(settings, "btype");
+	const char *ptype = obs_data_get_string(settings, "ptype");
 	const char *filename = obs_data_get_string(settings, "filename");
 	const char *label = obs_data_get_string(settings, "label");
 	int64_t uniqueId = 0;
@@ -206,9 +212,9 @@ void carla_priv_load(struct carla_priv *priv, obs_data_t *settings)
 	priv->bridge.cleanup();
 	priv->bridge.init(priv->bufferSize, priv->sampleRate);
 
-	if (!priv->bridge.start(getPluginTypeFromString(type), "x86_64",
-				"/usr/lib/carla/carla-bridge-native", label,
-				filename, uniqueId))
+	if (!priv->bridge.start(getBinaryTypeFromString(btype),
+				getPluginTypeFromString(ptype),
+				label, filename, uniqueId))
 	{
 		// TODO show error message if bridge fails
 		return;
@@ -299,15 +305,35 @@ static bool carla_priv_load_file_callback(obs_properties_t *props,
 	if (filename == NULL)
 		return false;
 
+	BinaryType btype;
+	PluginType ptype;
+
+	{
+		const QFileInfo fileInfo(QString::fromUtf8(filename));
+		const QString extension(fileInfo.suffix());
+
+#ifdef CARLA_OS_MAC
+		/**/ if (extension == "vst")
+			ptype = PLUGIN_VST2;
+#else
+		/**/ if (extension == "dll" || extension == "so")
+			ptype = PLUGIN_VST2;
+#endif
+		else if (extension == "vst3")
+			ptype = PLUGIN_VST3;
+		else if (extension == "clap")
+			ptype = PLUGIN_CLAP;
+		else
+			return false;
+
+		btype = getBinaryTypeFromFile(filename);
+	}
+
 	priv->bridge.cleanup();
 	priv->bridge.init(priv->bufferSize, priv->sampleRate);
 
-	const CarlaString binPath(get_carla_bin_path());
-
-	// TODO put in the correct types
 	// TODO show error message if bridge fails
-	priv->bridge.start(PLUGIN_VST2, "x86_64",
-			   binPath + CARLA_OS_SEP_STR "carla-bridge-native" APP_EXT,
+	priv->bridge.start(btype, ptype,
 			   "", filename, 0);
 
 	return carla_post_load_callback(priv, props);
@@ -333,8 +359,8 @@ static bool carla_priv_select_plugin_callback(obs_properties_t *props,
 	const CarlaString binPath(get_carla_bin_path());
 
 	// TODO show error message if bridge fails
-	priv->bridge.start((PluginType)plugin->type, "x86_64",
-			   binPath + CARLA_OS_SEP_STR "carla-bridge-native" APP_EXT,
+	priv->bridge.start((BinaryType)plugin->build,
+			   (PluginType)plugin->type,
 			   plugin->label, plugin->filename, plugin->uniqueId);
 
 	return carla_post_load_callback(priv, props);

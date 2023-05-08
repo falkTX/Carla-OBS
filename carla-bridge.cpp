@@ -23,7 +23,31 @@
 #include <QtCore/QCoreApplication>
 #include <QtCore/QDir>
 #include <QtCore/QFile>
+#include <QtCore/QFileInfo>
 #include <QtWidgets/QMessageBox>
+
+// ----------------------------------------------------------------------------
+
+#ifndef CARLA_OS_WIN
+static QString findWinePrefix(const QString filename, const int recursionLimit = 10)
+{
+    if (recursionLimit == 0 || filename.length() < 5 || ! filename.contains('/'))
+        return {};
+
+    const int lastSep = filename.lastIndexOf('/');
+    if (lastSep < 0)
+        return {};
+
+    const QString path(filename.left(lastSep));
+
+    if (QFileInfo(path + "/dosdevices").isDir())
+        return path;
+
+    return findWinePrefix(path, recursionLimit - 1);
+}
+#endif
+
+// ----------------------------------------------------------------------------
 
 struct BridgeTextReader {
 	char* text = nullptr;
@@ -225,32 +249,129 @@ void carla_bridge::cleanup()
 	audiopool.clear();
 	info.clear();
 	chunk.clear();
+	winePrefix.clear();
 	clear_custom_data();
 }
 
-bool carla_bridge::start(const PluginType type,
-			 const char *const binaryArchName,
-			 const char *const bridgeBinary, const char *label,
-			 const char *filename, const int64_t uniqueId)
+bool carla_bridge::start(const BinaryType btype,
+			 const PluginType ptype,
+			 const char *label,
+			 const char *filename,
+			 const int64_t uniqueId)
 {
-	CARLA_SAFE_ASSERT_RETURN(type != PLUGIN_NONE, false);
+	CARLA_SAFE_ASSERT_RETURN(btype != BINARY_NONE, false);
+	CARLA_SAFE_ASSERT_RETURN(ptype != PLUGIN_NONE, false);
 
-	UNUSED_PARAMETER(binaryArchName);
+	CarlaString bridgeBinary(get_carla_bin_path());
+
+#ifndef CARLA_OS_WIN
+	if (btype == BINARY_NATIVE)
+	{
+		bridgeBinary += CARLA_OS_SEP_STR "carla-bridge-native";
+	}
+	else
+#endif
+	{
+		switch (btype)
+		{
+		case BINARY_POSIX32:
+			bridgeBinary += CARLA_OS_SEP_STR "carla-bridge-posix32";
+			break;
+		case BINARY_POSIX64:
+			bridgeBinary += CARLA_OS_SEP_STR "carla-bridge-posix64";
+			break;
+		case BINARY_WIN32:
+#if defined(CARLA_OS_WIN) && !defined(CARLA_OS_64BIT)
+			bridgeBinary += CARLA_OS_SEP_STR "carla-bridge-native.exe";
+#else
+			bridgeBinary += CARLA_OS_SEP_STR "carla-bridge-win32.exe";
+#endif
+			break;
+		case BINARY_WIN64:
+#if defined(CARLA_OS_WIN) && defined(CARLA_OS_64BIT)
+			bridgeBinary += CARLA_OS_SEP_STR "carla-bridge-native.exe";
+#else
+			bridgeBinary += CARLA_OS_SEP_STR "carla-bridge-win64.exe";
+#endif
+			break;
+		default:
+			bridgeBinary.clear();
+			break;
+		}
+	}
+
+	if (! os_file_exists(bridgeBinary))
+	{
+		blog(LOG_ERROR, "[" CARLA_MODULE_ID "] Cannot load plugin, the required plugin bridge is not available");
+		return false;
+	}
 
 	BridgeProcess *proc = new BridgeProcess();
 
-	/* TODO
-	// setup binary arch
-	water::ChildProcess::Type childType;
 #ifdef CARLA_OS_MAC
-	if (std::strcmp(binaryArchName, "arm64") == 0)
-		childType = water::ChildProcess::TypeARM;
-	else if (std::strcmp(binaryArchName == "x86_64") == 0)
-		childType = water::ChildProcess::TypeIntel;
-	else
+	// Plugin might be in quarentine due to Apple stupid notarization rules, let's remove that if possible
+	if (ptype != PLUGIN_INTERNAL && ptype != PLUGIN_LV2 && ptype != PLUGIN_AU)
+		removeFileFromQuarantine(filename);
+
+	// see if this binary needs special help
+	if (ptype == PLUGIN_VST2 || ptype == PLUGIN_VST3)
+	{
+		const char* needsArchBridge = nullptr;
+
+		if (const char* const vstBinary = findBinaryInBundle(filename))
+		{
+			const CarlaMagic magic;
+			if (const char* const output = magic.getFileDescription(vstBinary))
+			{
+				blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] VST binary magic output is '%s'", output);
+#ifdef __aarch64__
+				if (std::strstr(output, "arm64") == nullptr && std::strstr(output, "x86_64") != nullptr)
+					needsArchBridge = "x86_64";
+#else
+				if (std::strstr(output, "x86_64") == nullptr && std::strstr(output, "arm64") != nullptr)
+					needsArchBridge = "arm64";
 #endif
-		childType = water::ChildProcess::TypeAny;
-	*/
+			}
+			else
+			{
+				blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] VST binary magic output is null");
+			}
+		}
+		else
+		{
+			blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] Search for binary in VST bundle failed");
+		}
+
+		if (needsArchBridge)
+		{
+			// TODO we need to hook into qprocess for either:
+			// posix_spawnattr_setbinpref_np + CPU_TYPE_ARM64 | CPU_TYPE_X86_64
+		}
+	}
+#endif
+
+	QStringList arguments;
+
+#ifndef CARLA_OS_WIN
+	// start with "wine" if needed
+	if (bridgeBinary.endsWith(".exe"))
+	{
+		arguments.append(QString::fromUtf8(bridgeBinary.buffer()));
+		bridgeBinary = "wine";
+
+		winePrefix = findWinePrefix(filename);
+
+		if (winePrefix.isEmpty())
+		{
+			const char* const envWinePrefix = std::getenv("WINEPREFIX");
+
+			if (envWinePrefix != nullptr && envWinePrefix[0] != '\0')
+				winePrefix = envWinePrefix;
+			else
+				winePrefix = QDir::homePath() + "/.wine";
+		}
+	}
+#endif
 
 	// do not use null strings for label and filename
 	if (label == nullptr || label[0] == '\0')
@@ -258,10 +379,8 @@ bool carla_bridge::start(const PluginType type,
 	if (filename == nullptr || filename[0] == '\0')
 		filename = "(none)";
 
-	QStringList arguments;
-
 	// plugin type
-	arguments.append(QString::fromUtf8(getPluginTypeAsString(type)));
+	arguments.append(QString::fromUtf8(getPluginTypeAsString(ptype)));
 
 	// filename
 	arguments.append(QString::fromUtf8(filename));
@@ -279,10 +398,10 @@ bool carla_bridge::start(const PluginType type,
 	}
 
 	blog(LOG_INFO, "[" CARLA_MODULE_ID "] Starting plugin bridge, command is:\n%s \"%s\" \"%s\" \"%s\" " P_INT64,
-		bridgeBinary, getPluginTypeAsString(type), filename,
+		bridgeBinary.buffer(), getPluginTypeAsString(ptype), filename,
 		label, uniqueId);
 
-	proc->setProgram(QString::fromUtf8(bridgeBinary));
+	proc->setProgram(QString::fromUtf8(bridgeBinary.buffer()));
 	proc->setArguments(arguments);
 	QMetaObject::invokeMethod(proc, "start");
 
@@ -317,7 +436,7 @@ bool carla_bridge::start(const PluginType type,
 		nonRtClientCtrl.commitWrite();
 	}
 
-	info.ptype = type;
+	info.ptype = ptype;
 	info.filename = filename;
 	info.label = label;
 

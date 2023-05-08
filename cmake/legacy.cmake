@@ -57,8 +57,7 @@ target_compile_definitions(
           CARLA_MODULE_NAME="Carla Bridge"
           CARLA_PLUGIN_ONLY_BRIDGE
           STATIC_PLUGIN_TARGET
-          $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
-          $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
+          $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>)
 
 target_include_directories(
   carla-bridge

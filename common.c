@@ -15,6 +15,7 @@
 #include <util/platform.h>
 
 #ifdef _WIN32
+#include <pthread.h>
 #include <windows.h>
 #else
 #include <dlfcn.h>
@@ -44,14 +45,34 @@ static const char* resource_path = NULL;
 #ifdef _WIN32
 static HINSTANCE module_handle = NULL;
 
-MODULE_EXPORT BOOL WINAPI DllMain(HINSTANCE hInst, DWORD reason, LPVOID arg)
+BOOL WINAPI DllMain(HINSTANCE hinst_dll, DWORD reason, LPVOID reserved)
 {
-	UNUSED_PARAMETER(arg);
+	switch (reason) {
+	case DLL_PROCESS_ATTACH:
+		module_handle = hinst_dll;
+#ifdef PTW32_STATIC_LIB
+		pthread_win32_process_attach_np();
+#endif
+		break;
+	case DLL_PROCESS_DETACH:
+#ifdef PTW32_STATIC_LIB
+		pthread_win32_process_detach_np();
+#endif
+		break;
+	case DLL_THREAD_ATTACH:
+#ifdef PTW32_STATIC_LIB
+		pthread_win32_thread_attach_np();
+#endif
+		break;
+	case DLL_THREAD_DETACH:
+#ifdef PTW32_STATIC_LIB
+		pthread_win32_thread_detach_np();
+#endif
+		break;
+	}
 
-	if (reason == DLL_PROCESS_ATTACH)
-		module_handle = hInst;
-
-	return TRUE;
+	UNUSED_PARAMETER(reserved);
+	return true;
 }
 #endif
 

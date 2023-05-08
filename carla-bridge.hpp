@@ -11,6 +11,7 @@
 
 #include <QtCore/QByteArray>
 #include <QtCore/QProcess>
+#include <QtCore/QString>
 
 #include <vector>
 
@@ -48,6 +49,7 @@ struct carla_param_data {
 
 // FIXME
 struct carla_bridge_info {
+	BinaryType btype = BINARY_NONE;
 	PluginType ptype = PLUGIN_NONE;
 	uint32_t hints = 0;
 	uint32_t options = PLUGIN_OPTIONS_NULL;
@@ -59,6 +61,7 @@ struct carla_bridge_info {
 
 	void clear()
 	{
+		btype = BINARY_NONE;
 		ptype = PLUGIN_NONE;
 		hints = 0;
 		options = PLUGIN_OPTIONS_NULL;
@@ -97,9 +100,8 @@ struct carla_bridge {
 	bool init(uint32_t maxBufferSize, double sampleRate);
 	void cleanup();
 
-	bool start(PluginType type, const char *binaryArchName,
-		   const char *bridgeBinary, const char *label,
-		   const char *filename, int64_t uniqueId);
+	bool start(BinaryType btype, PluginType ptype,
+		   const char *label, const char *filename, int64_t uniqueId);
 	bool isRunning() const;
 	bool isReady() const noexcept;
 
@@ -129,6 +131,7 @@ private:
 	bool saved = false;
 	bool timedOut = false;
 	uint32_t bufferSize = 0;
+	QString winePrefix;
 
 	BridgeAudioPool audiopool;                // fShmAudioPool
 	BridgeRtClientControl rtClientCtrl;       // fShmRtClientControl
