@@ -41,6 +41,10 @@ add_library(carla::rtmempool ALIAS carla-rtmempool)
 include(cmake/water.cmake)
 add_library(carla::water ALIAS carla-water)
 
+# Setup binary tools
+include(cmake/carla-discovery-native.cmake)
+include(cmake/carla-bridge-native.cmake)
+
 # Setup carla-bridge target
 add_library(carla-bridge MODULE)
 add_library(OBS::carla-bridge ALIAS carla-bridge)

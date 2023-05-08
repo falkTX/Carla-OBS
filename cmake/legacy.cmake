@@ -24,7 +24,7 @@ else()
   set(LIBMAGIC_FOUND FALSE)
 endif()
 
-# Optional: transient X11 window flags
+# Optional: X11 support on freedesktop systems
 if(PKGCONFIG_FOUND AND NOT (OS_MACOS OR OS_WINDOWS))
   pkg_check_modules(X11 "x11")
 else()
@@ -43,6 +43,10 @@ add_library(carla::rtmempool ALIAS carla-rtmempool)
 
 include(cmake/water.cmake)
 add_library(carla::water ALIAS carla-water)
+
+# Setup binary tools
+include(cmake/carla-discovery-native.cmake)
+include(cmake/carla-bridge-native.cmake)
 
 # Setup carla-bridge target
 add_library(carla-bridge MODULE)
