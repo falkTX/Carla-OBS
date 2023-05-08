@@ -67,7 +67,7 @@ void BridgeProcess::start()
 {
 	setInputChannelMode(QProcess::ForwardedInputChannel);
 	setProcessChannelMode(QProcess::ForwardedChannels);
-	QProcess::start(QIODevice::Unbuffered);
+	QProcess::start(QIODevice::Unbuffered | QIODevice::ReadOnly);
 }
 
 void BridgeProcess::stop()

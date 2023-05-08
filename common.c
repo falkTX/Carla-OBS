@@ -22,10 +22,6 @@
 #include <stdlib.h>
 #endif
 
-#ifdef _MSC_VER
-#define strdup _strdup
-#endif
-
 // ----------------------------------------------------------------------------
 
 #ifndef _WIN32
@@ -45,23 +41,41 @@ static const struct {
 static char* module_path = NULL;
 static const char* resource_path = NULL;
 
+#ifdef _WIN32
+static HINSTANCE module_handle = NULL;
+
+MODULE_EXPORT BOOL WINAPI DllMain(HINSTANCE hInst, DWORD reason, LPVOID arg)
+{
+	UNUSED_PARAMETER(arg);
+
+	if (reason == DLL_PROCESS_ATTACH)
+		module_handle = hInst;
+
+	return TRUE;
+}
+#endif
+
 const char *get_carla_bin_path(void)
 {
 	if (module_path != NULL)
 		return module_path;
 
+	char *rpath;
 #ifdef _WIN32
+	wchar_t path_utf16[MAX_PATH];
+	GetModuleFileNameW(module_handle, path_utf16, MAX_PATH);
+	os_wcs_to_utf8_ptr(path_utf16, 0, &rpath);
 #else
 	Dl_info info;
 	dladdr(get_carla_bin_path, &info);
-	module_path = realpath(info.dli_fname, NULL);
+	rpath = realpath(info.dli_fname, NULL);
 #endif
 
-	if (module_path == NULL)
+	if (rpath == NULL)
 		goto fail;
 
 	// find last separator
-	char *lastsep = strrchr(module_path, '/');
+	char *lastsep = strrchr(rpath, '/');
 	if (lastsep == NULL)
 		goto free;
 
@@ -73,21 +87,20 @@ const char *get_carla_bin_path(void)
 	}
 	*lastsep = '\0';
 
-	if (os_file_exists(module_path))
+	if (os_file_exists(rpath)) {
+		module_path = bstrdup(rpath);
+		free(rpath);
 		return module_path;
+	}
 
 free:
-	free(module_path);
-	module_path = NULL;
+	free(rpath);
 
 fail:
 #ifndef _WIN32
 	for (size_t i = 0; i < sizeof(carla_system_paths)/sizeof(carla_system_paths[0]); ++i) {
 		if (os_file_exists(carla_system_paths[i].bin)) {
-			/* NOTE we are intentionally not using bstrdup,
-			   as a previous allocation could be done by `realpath`
-			   so we keep everything `free` compatible. */
-			module_path = strdup(carla_system_paths[i].bin);
+			module_path = bstrdup(carla_system_paths[i].bin);
 			resource_path = carla_system_paths[i].res;
 			break;
 		}
@@ -175,7 +188,7 @@ void handle_update_request(obs_source_t *source, uint64_t *update_req)
 
 void obs_module_unload(void)
 {
-	free(module_path);
+	bfree(module_path);
 	module_path = NULL;
 }
 
