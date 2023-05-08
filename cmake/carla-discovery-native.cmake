@@ -10,7 +10,7 @@ target_include_directories(carla-discovery-native PRIVATE carla/source/backend c
                                                           carla/source/modules carla/source/utils)
 
 # TODO -mwindows
-target_link_libraries(carla-discovery-native PRIVATE carla::lilv $<$<BOOL:${OS_MACOS}>:-framework AppKit>
+target_link_libraries(carla-discovery-native PRIVATE carla::lilv $<$<BOOL:${OS_MACOS}>:"-framework AppKit">
                                                      $<$<BOOL:${OS_WINDOWS}>:ole32>)
 
 target_sources(carla-discovery-native PRIVATE carla/source/discovery/carla-discovery.cpp
