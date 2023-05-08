@@ -11,8 +11,7 @@ target_compile_definitions(
           $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
           $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
 
-target_compile_options(
-  carla-bridge-native PRIVATE $<$<BOOL:${OS_MACOS}>:-ObjC++> $<$<NOT:$<BOOL:${MSVC}>>:-Wno-error>)
+target_compile_options(carla-bridge-native PRIVATE $<$<BOOL:${OS_MACOS}>:-ObjC++> $<$<NOT:$<BOOL:${MSVC}>>:-Wno-error>)
 
 target_include_directories(
   carla-bridge-native
