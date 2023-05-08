@@ -272,21 +272,21 @@ bool carla_bridge::start(const PluginType type,
 	// uniqueId
 	arguments.append(QString::number(uniqueId));
 
-	bool started;
-
 	{
-		const CarlaScopedEnvVar sev("ENGINE_BRIDGE_SHM_IDS", shmIdsStr);
-
-		blog(LOG_INFO, "[" CARLA_MODULE_ID "] Starting plugin bridge, command is:\n%s \"%s\" \"%s\" \"%s\" " P_INT64,
-			bridgeBinary, getPluginTypeAsString(type), filename,
-			label, uniqueId);
-
-		started = false;
-		proc->setProgram(QString::fromUtf8(bridgeBinary));
-		proc->setArguments(arguments);
-		QMetaObject::invokeMethod(proc, "start");
-		started = proc->waitForStarted(5000) && proc->state() == QProcess::Running;
+		QProcessEnvironment env(QProcessEnvironment::systemEnvironment());
+		env.insert("ENGINE_BRIDGE_SHM_IDS", shmIdsStr);
+		proc->setProcessEnvironment(env);
 	}
+
+	blog(LOG_INFO, "[" CARLA_MODULE_ID "] Starting plugin bridge, command is:\n%s \"%s\" \"%s\" \"%s\" " P_INT64,
+		bridgeBinary, getPluginTypeAsString(type), filename,
+		label, uniqueId);
+
+	proc->setProgram(QString::fromUtf8(bridgeBinary));
+	proc->setArguments(arguments);
+	QMetaObject::invokeMethod(proc, "start");
+
+	const bool started = proc->waitForStarted(5000) && proc->state() == QProcess::Running;
 
 	if (!started) {
 		blog(LOG_INFO, "[" CARLA_MODULE_ID "] failed!");
