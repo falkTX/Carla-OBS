@@ -109,7 +109,8 @@ target_sources(
           carla/source/frontend/pluginlist/pluginlistdialog.cpp
           carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
           carla/source/utils/CarlaBridgeUtils.cpp
-          carla/source/utils/CarlaMacUtils.cpp)
+          carla/source/utils/CarlaMacUtils.cpp
+          carla/source/utils/CarlaPipeUtils.cpp)
 
 if(OS_MACOS)
   set_source_files_properties(carla/source/utils/CarlaMacUtils.cpp PROPERTIES COMPILE_FLAGS -ObjC++)
