@@ -62,6 +62,7 @@ target_compile_definitions(
   PRIVATE BUILDING_CARLA
           BUILDING_CARLA_OBS
           CARLA_BACKEND_NAMESPACE=CarlaBridgeOBS
+          CARLA_FRONTEND_NO_CACHED_PLUGIN_API
           CARLA_MODULE_ID="carla-bridge"
           CARLA_MODULE_NAME="Carla Bridge"
           CARLA_PLUGIN_ONLY_BRIDGE
@@ -79,8 +80,17 @@ target_include_directories(
           carla/source/utils
           ${LIBMAGIC_INCLUDE_DIRS})
 
-target_link_libraries(carla-bridge PRIVATE carla::jackbridge carla::lilv OBS::libobs Qt::Core Qt::Widgets
-                                           ${LIBMAGIC_LIBRARIES})
+# FIXME remove carla::water dependency from PluginDiscovery.cpp
+
+target_link_libraries(
+  carla-bridge
+  PRIVATE carla::jackbridge
+          carla::lilv
+          carla::water
+          OBS::libobs
+          Qt::Core
+          Qt::Widgets
+          ${LIBMAGIC_LIBRARIES})
 
 if(NOT (OS_MACOS OR OS_WINDOWS))
   target_link_options(carla-bridge PRIVATE -Wl,--no-undefined)
@@ -93,8 +103,8 @@ target_sources(
           carla-bridge-wrapper.cpp
           common.c
           qtutils.cpp
-          carla/source/backend/utils/CachedPlugins.cpp
           carla/source/backend/utils/Information.cpp
+          carla/source/backend/utils/PluginDiscovery.cpp
           carla/source/frontend/carla_frontend.cpp
           carla/source/frontend/pluginlist/pluginlistdialog.cpp
           carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
