@@ -13,7 +13,7 @@ elseif(NOT OS_FREEBSD)
   set(carla_discovery_extra_libs ${carla_discovery_extra_libs} dl)
 endif()
 
-target_compile_definitions(carla-discovery-native PRIVATE CARLA_BACKEND_NAMESPACE=CarlaOBS)
+target_compile_definitions(carla-discovery-native PRIVATE BUILDING_CARLA CARLA_BACKEND_NAMESPACE=CarlaOBS)
 
 target_compile_options(
   carla-discovery-native PRIVATE $<$<BOOL:${MSVC}>:/wd4244 /wd4267 /wd4273> $<$<BOOL:${OS_MACOS}>:-ObjC++>
