@@ -23,6 +23,14 @@
 #include <stdlib.h>
 #endif
 
+#ifdef __APPLE__
+// we assume running as bundle on macOS
+bool is_in_bundle()
+{
+	return true;
+}
+#endif
+
 // ----------------------------------------------------------------------------
 
 #ifndef _WIN32
@@ -81,34 +89,44 @@ const char *get_carla_bin_path(void)
 	if (module_path != NULL)
 		return module_path;
 
-	char *rpath;
+	char *mpath;
 #ifdef _WIN32
 	wchar_t path_utf16[MAX_PATH];
 	GetModuleFileNameW(module_handle, path_utf16, MAX_PATH);
-	os_wcs_to_utf8_ptr(path_utf16, 0, &rpath);
+	os_wcs_to_utf8_ptr(path_utf16, 0, &mpath);
 #else
 	Dl_info info;
 	dladdr(get_carla_bin_path, &info);
-	rpath = realpath(info.dli_fname, NULL);
+	mpath = realpath(info.dli_fname, NULL);
 #endif
 
-	if (rpath == NULL)
+	if (mpath == NULL)
 		goto fail;
 
 	// truncate to last separator
-	char *lastsep = strrchr(rpath, '/');
+	char *lastsep = strrchr(mpath, '/');
 	if (lastsep == NULL)
 		goto free;
 	*lastsep = '\0';
 
-	if (os_file_exists(rpath)) {
-		module_path = bstrdup(rpath);
-		free(rpath);
+#ifdef __APPLE__
+	// if running as app bundle, use its binary dir
+	if (is_in_bundle()) {
+		char *appbundlesep = strstr(mpath, "/PlugIns/carla-bridge.plugin/Contents/MacOS");
+		if (appbundlesep == NULL)
+		    goto free;
+		strcpy(appbundlesep, "/MacOS");
+	}
+#endif
+
+	if (os_file_exists(mpath)) {
+		module_path = bstrdup(mpath);
+		free(mpath);
 		return module_path;
 	}
 
 free:
-	free(rpath);
+	free(mpath);
 
 fail:
 #ifndef _WIN32

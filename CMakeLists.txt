@@ -22,6 +22,14 @@ else()
   set(carla_pthread_libs ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
+# FIXME Xcode and pkg-config don't mix
+if (XCODE)
+  set(PKGCONFIG_FOUND FALSE)
+  set(LIBMAGIC_LIBRARIES "")
+  mark_as_advanced(PKGCONFIG_FOUND)
+  mark_as_advanced(LIBMAGIC_LIBRARIES)
+endif()
+
 # Optional: finds correct plugin binary type
 if(PKGCONFIG_FOUND AND NOT OS_WINDOWS)
   pkg_check_modules(LIBMAGIC "libmagic")
@@ -34,6 +42,13 @@ if(PKGCONFIG_FOUND AND NOT (OS_MACOS OR OS_WINDOWS))
   pkg_check_modules(X11 "x11")
 else()
   set(X11_FOUND FALSE)
+endif()
+
+# Use *.mm files under macOS, regular *.cpp everywhere else
+if(OS_MACOS)
+  set(CARLA_OBJCPP_EXT "mm")
+else()
+  set(CARLA_OBJCPP_EXT "cpp")
 endif()
 
 # Import extra carla libs
@@ -109,12 +124,8 @@ target_sources(
           carla/source/frontend/pluginlist/pluginlistdialog.cpp
           carla/source/frontend/pluginlist/pluginlistrefreshdialog.cpp
           carla/source/utils/CarlaBridgeUtils.cpp
-          carla/source/utils/CarlaMacUtils.cpp
+          carla/source/utils/CarlaMacUtils.${CARLA_OBJCPP_EXT}
           carla/source/utils/CarlaPipeUtils.cpp)
-
-if(OS_MACOS)
-  set_source_files_properties(carla/source/utils/CarlaMacUtils.cpp PROPERTIES COMPILE_FLAGS -ObjC++)
-endif()
 
 if(OS_WINDOWS)
   set_property(
@@ -131,8 +142,8 @@ set_target_properties_obs(
              FOLDER plugins
              PREFIX "")
 
-# Setup carla-patchbay target (not available on Windows for now)
-if(NOT OS_WINDOWS)
+# Setup carla-patchbay target (not available on macOS or Windows for now)
+if(NOT (OS_MACOS OR OS_WINDOWS))
 
   add_library(carla-patchbay MODULE)
   add_library(OBS::carla-patchbay ALIAS carla-patchbay)
@@ -188,16 +199,12 @@ if(NOT OS_WINDOWS)
             carla/source/backend/engine/CarlaEngineData.cpp
             carla/source/backend/engine/CarlaEngineGraph.cpp
             carla/source/backend/engine/CarlaEngineInternal.cpp
-            carla/source/backend/engine/CarlaEngineNative.cpp
+            carla/source/backend/engine/CarlaEngineNative.${CARLA_OBJCPP_EXT}
             carla/source/backend/engine/CarlaEnginePorts.cpp
             carla/source/backend/engine/CarlaEngineRunner.cpp
             carla/source/backend/plugin/CarlaPlugin.cpp
             carla/source/backend/plugin/CarlaPluginBridge.cpp
             carla/source/backend/plugin/CarlaPluginInternal.cpp)
-
-  if(OS_MACOS)
-    set_source_files_properties(carla/source/backend/engine/CarlaEngineNative.cpp PROPERTIES COMPILE_FLAGS -ObjC++)
-  endif()
 
   set_target_properties_obs(carla-patchbay PROPERTIES FOLDER plugins PREFIX "")
 

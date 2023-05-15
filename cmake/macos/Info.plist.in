@@ -5,7 +5,7 @@
 	<key>CFBundleName</key>
 	<string>obs-carla</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.obsproject.obs-carla</string>
+	<string>com.obsproject.carla-bridge</string>
 	<key>CFBundleVersion</key>
 	<string>${MACOSX_BUNDLE_BUNDLE_VERSION}</string>
 	<key>CFBundleShortVersionString</key>

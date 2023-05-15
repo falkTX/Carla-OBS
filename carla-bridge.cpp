@@ -799,11 +799,11 @@ void carla_bridge::readMessages()
 		case kPluginBridgeNonRtServerPluginInfo1: {
 			info.clear();
 
-			const uint32_t category =
-				nonRtServerCtrl.readUInt();
+			// const uint32_t category =
+			nonRtServerCtrl.readUInt();
 			info.hints = nonRtServerCtrl.readUInt() | PLUGIN_IS_BRIDGE;
-			const uint32_t optionAv =
-				nonRtServerCtrl.readUInt();
+			// const uint32_t optionAv =
+			nonRtServerCtrl.readUInt();
 			info.options = nonRtServerCtrl.readUInt();
 			const int64_t uniqueId =
 				nonRtServerCtrl.readLong();

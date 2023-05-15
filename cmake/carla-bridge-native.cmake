@@ -12,7 +12,7 @@ target_compile_definitions(
           $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
 
 target_compile_options(
-  carla-bridge-native PRIVATE $<$<BOOL:${MSVC}>:/wd4244 /wd4267 /wd4273> $<$<BOOL:${OS_MACOS}>:-ObjC++>
+  carla-bridge-native PRIVATE $<$<BOOL:${MSVC}>:/wd4244 /wd4267 /wd4273>
                               $<$<NOT:$<BOOL:${MSVC}>>:-Wno-error -Werror=vla>)
 
 target_include_directories(
@@ -33,8 +33,8 @@ target_link_libraries(carla-bridge-native PRIVATE carla::jackbridge carla::lilv 
 
 target_sources(
   carla-bridge-native
-  PRIVATE carla/source/bridges-plugin/CarlaBridgePlugin.cpp
-          carla/source/backend/CarlaStandalone.cpp
+  PRIVATE carla/source/bridges-plugin/CarlaBridgePlugin.${CARLA_OBJCPP_EXT}
+          carla/source/backend/CarlaStandalone.${CARLA_OBJCPP_EXT}
           carla/source/backend/engine/CarlaEngine.cpp
           carla/source/backend/engine/CarlaEngineBridge.cpp
           carla/source/backend/engine/CarlaEngineClient.cpp
@@ -47,14 +47,15 @@ target_sources(
           carla/source/backend/plugin/CarlaPluginJuce.cpp
           carla/source/backend/plugin/CarlaPluginInternal.cpp
           carla/source/backend/plugin/CarlaPluginAU.cpp
-          carla/source/backend/plugin/CarlaPluginCLAP.cpp
+          carla/source/backend/plugin/CarlaPluginCLAP.${CARLA_OBJCPP_EXT}
           carla/source/backend/plugin/CarlaPluginLADSPADSSI.cpp
           carla/source/backend/plugin/CarlaPluginLV2.cpp
-          carla/source/backend/plugin/CarlaPluginVST2.cpp
-          carla/source/backend/plugin/CarlaPluginVST3.cpp)
+          carla/source/backend/plugin/CarlaPluginVST2.${CARLA_OBJCPP_EXT}
+          carla/source/backend/plugin/CarlaPluginVST3.${CARLA_OBJCPP_EXT})
 
-set_target_properties(carla-bridge-native PROPERTIES FOLDER "plugins/carla")
-
-if(NOT OS_MACOS)
+if(OS_MACOS)
+  set_target_properties_obs(carla-bridge-native PROPERTIES FOLDER plugins)
+else()
+  set_target_properties(carla-bridge-native PROPERTIES FOLDER plugins)
   setup_plugin_target(carla-bridge-native)
 endif()

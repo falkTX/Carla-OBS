@@ -16,7 +16,7 @@ endif()
 target_compile_definitions(carla-discovery-native PRIVATE BUILDING_CARLA CARLA_BACKEND_NAMESPACE=CarlaOBS)
 
 target_compile_options(
-  carla-discovery-native PRIVATE $<$<BOOL:${MSVC}>:/wd4244 /wd4267 /wd4273> $<$<BOOL:${OS_MACOS}>:-ObjC++>
+  carla-discovery-native PRIVATE $<$<BOOL:${MSVC}>:/wd4244 /wd4267 /wd4273>
                                  $<$<NOT:$<BOOL:${MSVC}>>:-Wno-error -Werror=vla>)
 
 target_include_directories(carla-discovery-native PRIVATE carla/source/backend carla/source/includes
@@ -25,11 +25,12 @@ target_include_directories(carla-discovery-native PRIVATE carla/source/backend c
 # TODO -mwindows
 target_link_libraries(carla-discovery-native PRIVATE carla::lilv ${carla_discovery_extra_libs})
 
-target_sources(carla-discovery-native PRIVATE carla/source/discovery/carla-discovery.cpp
-                                              carla/source/modules/water/water.files.cpp)
+target_sources(carla-discovery-native PRIVATE carla/source/discovery/carla-discovery.${CARLA_OBJCPP_EXT}
+                                              carla/source/modules/water/water.files.${CARLA_OBJCPP_EXT})
 
-set_target_properties(carla-discovery-native PROPERTIES FOLDER "plugins/carla")
-
-if(NOT OS_MACOS)
+if(OS_MACOS)
+  set_target_properties_obs(carla-discovery-native PROPERTIES FOLDER plugins)
+else()
+  set_target_properties(carla-discovery-native PROPERTIES FOLDER plugins)
   setup_plugin_target(carla-discovery-native)
 endif()
