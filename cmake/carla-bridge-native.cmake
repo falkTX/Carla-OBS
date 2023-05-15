@@ -12,10 +12,14 @@ target_compile_definitions(
           $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
 
 target_compile_options(
-  carla-bridge-native PRIVATE $<$<BOOL:${MSVC}>:/wd4244 /wd4267 /wd4273>
-                              $<$<NOT:$<BOOL:${MSVC}>>:-Wno-error -Werror=vla>
-                              ${LIBMAGIC_CFLAGS}
-                              ${X11_CFLAGS})
+  carla-bridge-native
+  PRIVATE $<$<BOOL:${MSVC}>:/wd4244
+          /wd4267
+          /wd4273>
+          $<$<NOT:$<BOOL:${MSVC}>>:-Wno-error
+          -Werror=vla>
+          ${LIBMAGIC_CFLAGS}
+          ${X11_CFLAGS})
 
 target_include_directories(
   carla-bridge-native

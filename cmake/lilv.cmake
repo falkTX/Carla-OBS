@@ -2,12 +2,8 @@
 if(MSVC)
   set(carla_lilv_compile_options /wd4005 /wd4090 /wd4133 /wd4244 /wd4267 /wd4273)
 elseif(CLANG)
-  set(carla_lilv_compile_options
-      -Wno-error
-      -Wno-deprecated-declarations
-      -Wno-implicit-fallthrough
-      -Wno-incompatible-pointer-types-discards-qualifiers
-      -Wno-unused-parameter)
+  set(carla_lilv_compile_options -Wno-error -Wno-deprecated-declarations -Wno-implicit-fallthrough
+                                 -Wno-incompatible-pointer-types-discards-qualifiers -Wno-unused-parameter)
 else()
   set(carla_lilv_compile_options
       -Wno-error

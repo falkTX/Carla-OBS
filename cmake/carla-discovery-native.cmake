@@ -15,9 +15,8 @@ endif()
 
 target_compile_definitions(carla-discovery-native PRIVATE BUILDING_CARLA CARLA_BACKEND_NAMESPACE=CarlaOBS)
 
-target_compile_options(
-  carla-discovery-native PRIVATE $<$<BOOL:${MSVC}>:/wd4244 /wd4267 /wd4273>
-                                 $<$<NOT:$<BOOL:${MSVC}>>:-Wno-error -Werror=vla>)
+target_compile_options(carla-discovery-native PRIVATE $<$<BOOL:${MSVC}>:/wd4244 /wd4267 /wd4273>
+                                                      $<$<NOT:$<BOOL:${MSVC}>>:-Wno-error -Werror=vla>)
 
 target_include_directories(carla-discovery-native PRIVATE carla/source/backend carla/source/includes
                                                           carla/source/modules carla/source/utils)
