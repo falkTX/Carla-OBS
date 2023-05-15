@@ -29,6 +29,8 @@ endif()
 add_library(carla-water STATIC)
 mark_as_advanced(carla-water)
 
+set_target_properties(carla-water PROPERTIES OSX_ARCHITECTURES "x86_64;arm64")
+
 if(NOT OS_WINDOWS)
   set_property(TARGET carla-water PROPERTY POSITION_INDEPENDENT_CODE ON)
 endif()

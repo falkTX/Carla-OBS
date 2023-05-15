@@ -79,6 +79,8 @@ target_compile_definitions(
           STATIC_PLUGIN_TARGET
           $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>)
 
+target_compile_options(carla-bridge PRIVATE ${LIBMAGIC_CFLAGS})
+
 target_include_directories(
   carla-bridge
   PRIVATE carla/source
@@ -89,6 +91,8 @@ target_include_directories(
           carla/source/modules
           carla/source/utils
           ${LIBMAGIC_INCLUDE_DIRS})
+
+target_link_directories(carla-bridge PRIVATE ${LIBMAGIC_LIBRARY_DIRS})
 
 # FIXME remove carla::water dependency from PluginDiscovery.cpp
 
@@ -154,6 +158,8 @@ if(NOT (OS_MACOS OR OS_WINDOWS))
             $<$<BOOL:${LIBMAGIC_FOUND}>:HAVE_LIBMAGIC>
             $<$<BOOL:${X11_FOUND}>:HAVE_X11>)
 
+  target_compile_options(carla-patchbay PRIVATE ${LIBMAGIC_CFLAGS} ${X11_CFLAGS})
+
   target_include_directories(
     carla-patchbay
     PRIVATE carla/source
@@ -164,7 +170,7 @@ if(NOT (OS_MACOS OR OS_WINDOWS))
             ${LIBMAGIC_INCLUDE_DIRS}
             ${X11_INCLUDE_DIRS})
 
-  target_link_directories(carla-patchbay PRIVATE ${LIBMAGIC_LIBRARY_DIRS})
+  target_link_directories(carla-patchbay PRIVATE ${LIBMAGIC_LIBRARY_DIRS} ${X11_LIBRARY_DIRS})
 
   target_link_libraries(
     carla-patchbay

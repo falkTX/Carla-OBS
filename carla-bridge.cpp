@@ -299,21 +299,17 @@ bool carla_bridge::start(const BinaryType btype,
 
 	BridgeProcess *proc = new BridgeProcess();
 
-#ifdef CARLA_OS_MAC
-	// Plugin might be in quarentine due to Apple stupid notarization rules, let's remove that if possible
-	/*
-	if (ptype != PLUGIN_INTERNAL && ptype != PLUGIN_LV2 && ptype != PLUGIN_AU)
-		removeFileFromQuarantine(filename);
-	*/
+	QStringList arguments;
 
+#ifdef CARLA_OS_MAC
 	// see if this binary needs special help
 	if (ptype == PLUGIN_VST2 || ptype == PLUGIN_VST3)
 	{
 		const char* needsArchBridge = nullptr;
 
-		#ifdef HAVE_LIBMAGIC
 		if (const char* const vstBinary = findBinaryInBundle(filename))
 		{
+			#ifdef HAVE_LIBMAGIC
 			const CarlaMagic magic;
 			if (const char* const output = magic.getFileDescription(vstBinary))
 			{
@@ -330,22 +326,37 @@ bool carla_bridge::start(const BinaryType btype,
 			{
 				blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] VST binary magic output is null");
 			}
+			#elif __aarch64__
+			// if libmagic is not available, lets at least cover the case of x86_64 plugins under arm64 systems
+			if (FILE* const f = fopen(vstBinary, "r"))
+			{
+				uint8_t buf[8];
+				if (fread(buf, 8, 1, f) == 1)
+				{
+					const uint32_t magic = *(uint32_t*)buf;
+					if (magic == 0xfeedfacf && buf[4] == 0x07)
+						needsArchBridge = "x86_64";
+				}
+				fclose(f);
+			}
+			#endif
 		}
 		else
 		{
 			blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] Search for binary in VST bundle failed");
 		}
-		#endif
 
 		if (needsArchBridge)
 		{
-			// TODO we need to hook into qprocess for either:
+			// TODO we need to hook into qprocess for:
 			// posix_spawnattr_setbinpref_np + CPU_TYPE_ARM64 | CPU_TYPE_X86_64
+			arguments.append("-arch");
+			arguments.append(needsArchBridge);
+			arguments.append(QString::fromUtf8(bridgeBinary.buffer()));
+			bridgeBinary = "arch";
 		}
 	}
 #endif
-
-	QStringList arguments;
 
 #ifndef CARLA_OS_WIN
 	// start with "wine" if needed

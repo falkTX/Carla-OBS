@@ -6,6 +6,8 @@ set(carla_rtmempool_extra_libs ${carla_pthread_libs})
 add_library(carla-rtmempool STATIC)
 mark_as_advanced(carla-rtmempool)
 
+set_target_properties(carla-rtmempool PROPERTIES OSX_ARCHITECTURES "x86_64;arm64")
+
 if(NOT OS_WINDOWS)
   set_property(TARGET carla-rtmempool PROPERTY POSITION_INDEPENDENT_CODE ON)
 endif()

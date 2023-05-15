@@ -28,9 +28,10 @@ target_link_libraries(carla-discovery-native PRIVATE carla::lilv ${carla_discove
 target_sources(carla-discovery-native PRIVATE carla/source/discovery/carla-discovery.${CARLA_OBJCPP_EXT}
                                               carla/source/modules/water/water.files.${CARLA_OBJCPP_EXT})
 
+set_target_properties(carla-discovery-native PROPERTIES FOLDER plugins OSX_ARCHITECTURES "x86_64;arm64")
+
 if(OS_MACOS)
-  set_target_properties_obs(carla-discovery-native PROPERTIES FOLDER plugins)
+  set_target_properties_obs(carla-discovery-native)
 else()
-  set_target_properties(carla-discovery-native PROPERTIES FOLDER plugins)
   setup_plugin_target(carla-discovery-native)
 endif()

@@ -1,6 +1,13 @@
 # base config
 if(MSVC)
   set(carla_lilv_compile_options /wd4005 /wd4090 /wd4133 /wd4244 /wd4267 /wd4273)
+elseif(CLANG)
+  set(carla_lilv_compile_options
+      -Wno-error
+      -Wno-deprecated-declarations
+      -Wno-implicit-fallthrough
+      -Wno-incompatible-pointer-types-discards-qualifiers
+      -Wno-unused-parameter)
 else()
   set(carla_lilv_compile_options
       -Wno-error
@@ -26,6 +33,8 @@ endif()
 # serd
 add_library(carla-lilv_serd STATIC)
 
+set_target_properties(carla-lilv_serd PROPERTIES OSX_ARCHITECTURES "x86_64;arm64")
+
 if(NOT OS_WINDOWS)
   set_property(TARGET carla-lilv_serd PROPERTY POSITION_INDEPENDENT_CODE ON)
 endif()
@@ -38,6 +47,8 @@ target_sources(carla-lilv_serd PRIVATE ${carla_lilv_basedir}/serd.c)
 
 # sord
 add_library(carla-lilv_sord STATIC)
+
+set_target_properties(carla-lilv_sord PROPERTIES OSX_ARCHITECTURES "x86_64;arm64")
 
 if(NOT OS_WINDOWS)
   set_property(TARGET carla-lilv_sord PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -59,6 +70,8 @@ target_sources(carla-lilv_sord PRIVATE ${carla_lilv_basedir}/sord.c)
 # sratom
 add_library(carla-lilv_sratom STATIC)
 
+set_target_properties(carla-lilv_sratom PROPERTIES OSX_ARCHITECTURES "x86_64;arm64")
+
 if(NOT OS_WINDOWS)
   set_property(TARGET carla-lilv_sratom PROPERTY POSITION_INDEPENDENT_CODE ON)
 endif()
@@ -74,6 +87,8 @@ target_sources(carla-lilv_sratom PRIVATE ${carla_lilv_basedir}/sratom.c)
 
 # lilv
 add_library(carla-lilv_lilv STATIC)
+
+set_target_properties(carla-lilv_lilv PROPERTIES OSX_ARCHITECTURES "x86_64;arm64")
 
 if(NOT OS_WINDOWS)
   set_property(TARGET carla-lilv_lilv PROPERTY POSITION_INDEPENDENT_CODE ON)

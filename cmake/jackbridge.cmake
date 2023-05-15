@@ -13,9 +13,7 @@ endif()
 add_library(carla-jackbridge STATIC)
 mark_as_advanced(carla-jackbridge)
 
-if(NOT OS_WINDOWS)
-  set_property(TARGET carla-jackbridge PROPERTY POSITION_INDEPENDENT_CODE ON)
-endif()
+set_target_properties(carla-jackbridge PROPERTIES OSX_ARCHITECTURES "x86_64;arm64" POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(carla-jackbridge PRIVATE carla/source/includes carla/source/utils)
 

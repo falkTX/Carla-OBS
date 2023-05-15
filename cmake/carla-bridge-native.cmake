@@ -13,7 +13,9 @@ target_compile_definitions(
 
 target_compile_options(
   carla-bridge-native PRIVATE $<$<BOOL:${MSVC}>:/wd4244 /wd4267 /wd4273>
-                              $<$<NOT:$<BOOL:${MSVC}>>:-Wno-error -Werror=vla>)
+                              $<$<NOT:$<BOOL:${MSVC}>>:-Wno-error -Werror=vla>
+                              ${LIBMAGIC_CFLAGS}
+                              ${X11_CFLAGS})
 
 target_include_directories(
   carla-bridge-native
@@ -26,6 +28,8 @@ target_include_directories(
           carla/source/utils
           ${LIBMAGIC_INCLUDE_DIRS}
           ${X11_INCLUDE_DIRS})
+
+target_link_directories(carla-bridge-native PRIVATE ${LIBMAGIC_LIBRARY_DIRS} ${X11_LIBRARY_DIRS})
 
 # TODO -mwindows
 target_link_libraries(carla-bridge-native PRIVATE carla::jackbridge carla::lilv carla::rtmempool carla::water
@@ -53,9 +57,10 @@ target_sources(
           carla/source/backend/plugin/CarlaPluginVST2.${CARLA_OBJCPP_EXT}
           carla/source/backend/plugin/CarlaPluginVST3.${CARLA_OBJCPP_EXT})
 
+set_target_properties(carla-bridge-native PROPERTIES FOLDER plugins OSX_ARCHITECTURES "x86_64;arm64")
+
 if(OS_MACOS)
-  set_target_properties_obs(carla-bridge-native PROPERTIES FOLDER plugins)
+  set_target_properties_obs(carla-bridge-native)
 else()
-  set_target_properties(carla-bridge-native PROPERTIES FOLDER plugins)
   setup_plugin_target(carla-bridge-native)
 endif()
