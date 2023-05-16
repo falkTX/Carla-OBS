@@ -77,9 +77,6 @@ struct carla_priv *carla_priv_create(obs_source_t *source,
 	if (priv->bufferSize == 0)
 		goto fail1;
 
-	// FIXME?
-	priv->bridge.activate();
-
 	return priv;
 
 fail1:
@@ -227,7 +224,7 @@ void carla_priv_load(struct carla_priv *priv, obs_data_t *settings)
 			const char *type = obs_data_get_string(data, "type");
 			const char *key = obs_data_get_string(data, "key");
 			const char *value = obs_data_get_string(data, "value");
-			priv->bridge.add_custom_data(type, key, value, true);
+			priv->bridge.add_custom_data(type, key, value);
 		}
 		priv->bridge.custom_data_loaded();
 	}
@@ -332,7 +329,8 @@ static bool carla_priv_load_file_callback(obs_properties_t *props,
 	priv->bridge.init(priv->bufferSize, priv->sampleRate);
 
 	// TODO show error message if bridge fails
-	priv->bridge.start(btype, ptype, "", filename, 0);
+	if (priv->bridge.start(btype, ptype, "", filename, 0))
+		priv->bridge.activate();
 
 	return carla_post_load_callback(priv, props);
 }
@@ -356,8 +354,50 @@ static bool carla_priv_select_plugin_callback(obs_properties_t *props,
 	priv->bridge.init(priv->bufferSize, priv->sampleRate);
 
 	// TODO show error message if bridge fails
-	priv->bridge.start((BinaryType)plugin->build, (PluginType)plugin->type,
-			   plugin->label, plugin->filename, plugin->uniqueId);
+	if (priv->bridge.start(static_cast<BinaryType>(plugin->build),
+			       static_cast<PluginType>(plugin->type),
+			       plugin->label, plugin->filename,
+			       plugin->uniqueId))
+		priv->bridge.activate();
+
+	return carla_post_load_callback(priv, props);
+}
+
+static bool carla_priv_reload_callback(obs_properties_t *props,
+				       obs_property_t *property, void *data)
+{
+	UNUSED_PARAMETER(property);
+
+	struct carla_priv *priv = static_cast<struct carla_priv *>(data);
+
+	if (priv->bridge.is_running()) {
+		priv->bridge.reload();
+		return true;
+	}
+
+	if (priv->bridge.info.btype == BINARY_NONE)
+		return false;
+
+	// cache relevant information for later
+	const BinaryType btype = priv->bridge.info.btype;
+	const PluginType ptype = priv->bridge.info.ptype;
+	const int64_t uniqueId = priv->bridge.info.uniqueId;
+	char *const label = priv->bridge.info.label.releaseBufferPointer();
+	char *const filename =
+		priv->bridge.info.filename.releaseBufferPointer();
+
+	priv->bridge.cleanup(false);
+	priv->bridge.init(priv->bufferSize, priv->sampleRate);
+
+	if (priv->bridge.start(btype, ptype, label, filename, uniqueId)) {
+		priv->bridge.restore_state();
+		priv->bridge.activate();
+	}
+
+	// TODO show error message if bridge fails
+
+	std::free(label);
+	std::free(filename);
 
 	return carla_post_load_callback(priv, props);
 }
@@ -442,9 +482,13 @@ void carla_priv_readd_properties(struct carla_priv *priv,
 		obs_properties_add_button2(props, PROP_LOAD_FILE,
 					   obs_module_text("Load file..."),
 					   carla_priv_load_file_callback, priv);
+
+		obs_properties_add_button2(props, PROP_RELOAD_PLUGIN,
+					   obs_module_text("Reload"),
+					   carla_priv_reload_callback, priv);
 	}
 
-	if (priv->bridge.isRunning()) {
+	if (priv->bridge.info.hints & PLUGIN_HAS_CUSTOM_UI) {
 		obs_properties_add_button2(props, PROP_SHOW_GUI,
 					   obs_module_text("Show custom GUI"),
 					   carla_priv_show_gui_callback, priv);

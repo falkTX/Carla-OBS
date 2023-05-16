@@ -19,6 +19,7 @@
 // property names
 #define PROP_LOAD_FILE "load-file"
 #define PROP_SELECT_PLUGIN "select-plugin"
+#define PROP_RELOAD_PLUGIN "reload"
 #define PROP_SHOW_GUI "show-gui"
 
 #define PROP_CHUNK "chunk"

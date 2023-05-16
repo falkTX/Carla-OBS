@@ -21,6 +21,9 @@
 // for audio generator thread
 #include <pthread.h>
 
+// default mode, defined as macro for easy change
+#define DEFAULT_BUFFER_SIZE_MODE buffer_size_direct
+
 // --------------------------------------------------------------------------------------------------------------------
 
 struct carla_data {
@@ -137,8 +140,8 @@ static void *carla_obs_create(obs_data_t *settings, obs_source_t *source,
 	if (carla->dummybuffer == NULL)
 		goto fail2;
 
-	struct carla_priv *priv =
-		carla_priv_create(source, buffer_size_direct, sample_rate);
+	struct carla_priv *priv = carla_priv_create(
+		source, DEFAULT_BUFFER_SIZE_MODE, sample_rate);
 	if (carla == NULL)
 		goto fail3;
 
@@ -149,14 +152,12 @@ static void *carla_obs_create(obs_data_t *settings, obs_source_t *source,
 
 	carla->buffer_head = 0;
 	carla->buffer_tail = UINT16_MAX;
-	carla->buffer_size_mode = buffer_size_direct;
+	carla->buffer_size_mode = DEFAULT_BUFFER_SIZE_MODE;
 
 	// audio generator, aka input source
 	carla->audiogen_enabled = !isFilter;
 
 	obs_add_tick_callback(carla_obs_idle_callback, carla);
-
-	carla_obs_activate(carla);
 
 	return carla;
 
@@ -185,10 +186,11 @@ static void *carla_obs_create_input(obs_data_t *settings, obs_source_t *source)
 static void carla_obs_destroy(void *data)
 {
 	struct carla_data *carla = data;
-	obs_remove_tick_callback(carla_obs_idle_callback, carla);
 
 	if (carla->activated)
 		carla_obs_deactivate(carla);
+
+	obs_remove_tick_callback(carla_obs_idle_callback, carla);
 
 	carla_priv_destroy(carla->priv);
 
@@ -213,6 +215,10 @@ static void carla_obs_activate(void *data)
 {
 	struct carla_data *carla = data;
 	assert(!carla->activated);
+
+	if (carla->activated)
+		return;
+
 	carla->activated = true;
 
 	carla_priv_activate(carla->priv);
@@ -229,6 +235,10 @@ static void carla_obs_deactivate(void *data)
 {
 	struct carla_data *carla = data;
 	assert(carla->activated);
+
+	if (!carla->activated)
+		return;
+
 	carla->activated = false;
 
 	if (carla->audiogen_running) {

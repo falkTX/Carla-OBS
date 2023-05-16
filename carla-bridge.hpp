@@ -16,17 +16,21 @@
 #include <vector>
 
 // generates warning if defined as anything else
+#define CARLA_API
+
+// import macro from OBS, purposefully not including any other OBS APIs here
 #define MAX_AV_PLANES 8
 
 CARLA_BACKEND_USE_NAMESPACE
 
 // ----------------------------------------------------------------------------
+// custom class for allowing QProcess usage outside the main thread
 
 class BridgeProcess : public QProcess {
 	Q_OBJECT
 
 public:
-	BridgeProcess();
+	BridgeProcess(const char *shmIds);
 
 public Q_SLOTS:
 	void start();
@@ -34,6 +38,7 @@ public Q_SLOTS:
 };
 
 // ----------------------------------------------------------------------------
+// relevant information for an exposed plugin parameter
 
 struct carla_param_data {
 	uint32_t hints = 0;
@@ -47,7 +52,9 @@ struct carla_param_data {
 	CarlaString unit;
 };
 
-// FIXME
+// ----------------------------------------------------------------------------
+// information about the currently active plugin
+
 struct carla_bridge_info {
 	BinaryType btype = BINARY_NONE;
 	PluginType ptype = PLUGIN_NONE;
@@ -55,9 +62,9 @@ struct carla_bridge_info {
 	uint32_t options = PLUGIN_OPTIONS_NULL;
 	uint32_t numAudioIns = 0;
 	uint32_t numAudioOuts = 0;
+	int64_t uniqueId = 0;
 	CarlaString filename;
 	CarlaString label;
-	int64_t uniqueId = 0;
 
 	void clear()
 	{
@@ -73,18 +80,22 @@ struct carla_bridge_info {
 };
 
 // ----------------------------------------------------------------------------
+// bridge callbacks, triggered during carla_bridge::idle()
 
 struct carla_bridge_callback {
 	virtual ~carla_bridge_callback(){};
 	virtual void bridge_parameter_changed(uint index, float value) = 0;
 };
 
+// ----------------------------------------------------------------------------
+// bridge implementation
+
 struct carla_bridge {
 	carla_bridge_callback *callback = nullptr;
 
 	// cached parameter info
 	uint32_t paramCount = 0;
-	struct carla_param_data *paramDetails = nullptr;
+	carla_param_data *paramDetails = nullptr;
 
 	// cached plugin info
 	carla_bridge_info info;
@@ -97,43 +108,78 @@ struct carla_bridge {
 		clear_custom_data();
 	}
 
+	// initialize bridge shared memory details
 	bool init(uint32_t maxBufferSize, double sampleRate);
-	void cleanup();
 
+	// stop bridge process and cleanup shared memory
+	void cleanup(bool clearPluginData = true);
+
+	// start plugin bridge
 	bool start(BinaryType btype, PluginType ptype, const char *label,
 		   const char *filename, int64_t uniqueId);
-	bool isRunning() const;
-	bool isReady() const noexcept;
 
+	// check if plugin bridge process is running
+	// return status might be wrong when called outside the main thread
+	bool is_running() const;
+
+	// to be called at regular intervals, from the main thread
+	// returns false if bridge process is not running
 	bool idle();
 
-	// waits on RT client, making sure it is still active
+	// wait on RT client, making sure it is still active
+	// returns true on success
+	// NOTE: plugin will be deactivated on next `idle()` if timed out
 	bool wait(const char *action, uint msecs);
 
+	// change a plugin parameter value
 	void set_value(uint index, float value);
+
+	// show the plugin's custom UI
 	void show_ui();
 
+	// [de]activate, a deactivated plugin does not process any audio
+	// bool is_active() const noexcept;
 	void activate();
 	void deactivate();
+
+	// reactivate and reload plugin information
+	void reload();
+
+	// restore current state from known info, useful when bridge crashes
+	void restore_state();
+
+	// process plugin audio
+	// frames must be <= `maxBufferSize` as passed during `init`
 	void process(float *buffers[MAX_AV_PLANES], uint32_t frames);
 
+	// add or replace custom data (non-parameter plugin values)
 	void add_custom_data(const char *type, const char *key,
-			     const char *value, bool sendToPlugin);
+			     const char *value, bool sendToPlugin = true);
+
+	// inform plugin that all custom data has been loaded
+	// required after loading plugin state
 	void custom_data_loaded();
+
+	// clear all custom data stored so far
 	void clear_custom_data();
 
+	// load plugin state as base64 chunk
+	// NOTE: do not save parameter values for plugins using "chunks"
 	void load_chunk(const char *b64chunk);
+
+	// request plugin bridge to save and report back its internal state
+	// must be called just before saving plugin state
 	void save_and_wait();
 
 private:
-	char shmIdsStr[6 * 4 + 1] = {};
 	bool activated = false;
+	bool pendingPing = false;
 	bool ready = false;
 	bool saved = false;
+	bool timedErr = false;
 	bool timedOut = false;
 	uint32_t bufferSize = 0;
 	uint32_t clientBridgeVersion = 0;
-	QString winePrefix;
 
 	BridgeAudioPool audiopool;                // fShmAudioPool
 	BridgeRtClientControl rtClientCtrl;       // fShmRtClientControl
