@@ -705,7 +705,8 @@ void carla_bridge::restore_state()
 	}
 
 	if (info.ptype != PLUGIN_LV2) {
-		nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientRestoreLV2State);
+		nonRtClientCtrl.writeOpcode(
+			kPluginBridgeNonRtClientRestoreLV2State);
 		nonRtClientCtrl.commitWrite();
 	}
 
@@ -987,7 +988,8 @@ void carla_bridge::set_buffer_size(const uint32_t maxBufferSize)
 		audiopool.resize(maxBufferSize, MAX_AV_PLANES, MAX_AV_PLANES);
 
 		rtClientCtrl.writeOpcode(kPluginBridgeRtClientSetAudioPool);
-		rtClientCtrl.writeULong(static_cast<uint64_t>(audiopool.dataSize));
+		rtClientCtrl.writeULong(
+			static_cast<uint64_t>(audiopool.dataSize));
 		rtClientCtrl.commitWrite();
 
 		rtClientCtrl.writeOpcode(kPluginBridgeRtClientSetBufferSize);
