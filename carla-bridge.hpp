@@ -131,6 +131,7 @@ private:
 	bool saved = false;
 	bool timedOut = false;
 	uint32_t bufferSize = 0;
+	uint32_t clientBridgeVersion = 0;
 	QString winePrefix;
 
 	BridgeAudioPool audiopool;                // fShmAudioPool

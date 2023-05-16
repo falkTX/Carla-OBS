@@ -21,7 +21,6 @@
 
 #include <ctime>
 
-#include <QtCore/QCoreApplication>
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
@@ -618,7 +617,10 @@ void carla_bridge::process(float *buffers[MAX_AV_PLANES], uint32_t frames)
 	}
 }
 
-void carla_bridge::add_custom_data(const char* const type, const char* const key, const char* const value, const bool sendToPlugin)
+void carla_bridge::add_custom_data(const char* const type,
+				   const char* const key,
+				   const char* const value,
+				   const bool sendToPlugin)
 {
 	CARLA_SAFE_ASSERT_RETURN(type != nullptr && type[0] != '\0',);
 	CARLA_SAFE_ASSERT_RETURN(key != nullptr && key[0] != '\0',);
@@ -629,28 +631,31 @@ void carla_bridge::add_custom_data(const char* const type, const char* const key
 	{
 		if (std::strcmp(cdata.key, key) == 0)
 		{
-			if (cdata.value != nullptr)
-				delete[] cdata.value;
-
-			cdata.value = carla_strdup(value);
+			bfree(const_cast<char*>(cdata.value));
+			cdata.value = bstrdup(value);
 			return;
 		}
 	}
 
 	// Otherwise store it
 	CustomData cdata = {};
-	cdata.type  = carla_strdup(type);
-	cdata.key   = carla_strdup(key);
-	cdata.value = carla_strdup(value);
+	cdata.type  = bstrdup(type);
+	cdata.key   = bstrdup(key);
+	cdata.value = bstrdup(value);
 	customData.push_back(cdata);
 
 	if (sendToPlugin)
 	{
+		const uint32_t maxLocalValueLen = clientBridgeVersion >= 10 ? 4096 : 16384;
+
 		const uint32_t typeLen  = static_cast<uint32_t>(std::strlen(type));
 		const uint32_t keyLen   = static_cast<uint32_t>(std::strlen(key));
 		const uint32_t valueLen = static_cast<uint32_t>(std::strlen(value));
 
 		const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
+
+		if (valueLen > maxLocalValueLen)
+			nonRtClientCtrl.waitIfDataIsReachingLimit();
 
 		nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientSetCustomData);
 
@@ -664,7 +669,7 @@ void carla_bridge::add_custom_data(const char* const type, const char* const key
 
 		if (valueLen > 0)
 		{
-			if (valueLen > 16384)
+			if (valueLen > maxLocalValueLen)
 			{
 				QString filePath(QDir::tempPath());
 
@@ -672,7 +677,8 @@ void carla_bridge::add_custom_data(const char* const type, const char* const key
 				filePath += audiopool.getFilenameSuffix();
 
 				QFile file(filePath);
-				if (file.open(QIODevice::WriteOnly) && file.write(value) != 0)
+				if (file.open(QIODevice::WriteOnly)
+					&& file.write(value) != static_cast<qint64>(valueLen))
 				{
 					const uint32_t ulength = static_cast<uint32_t>(filePath.length());
 
@@ -708,9 +714,9 @@ void carla_bridge::clear_custom_data()
 {
 	for (CustomData& cdata : customData)
 	{
-		delete[] cdata.type;
-		delete[] cdata.key;
-		delete[] cdata.value;
+		bfree(const_cast<char*>(cdata.type));
+		bfree(const_cast<char*>(cdata.key));
+		bfree(const_cast<char*>(cdata.value));
 	}
 	customData.clear();
 }
@@ -764,7 +770,6 @@ void carla_bridge::save_and_wait()
 	{
 		readMessages();
 		carla_msleep(5);
-		// QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 50);
 	}
 
 	if (isRunning())
@@ -803,7 +808,7 @@ void carla_bridge::readMessages()
 
 		// uint/version
 		case kPluginBridgeNonRtServerVersion:
-			nonRtServerCtrl.readUInt();
+			clientBridgeVersion = nonRtServerCtrl.readUInt();
 			break;
 
 		// uint/category, uint/hints, uint/optionsAvailable, uint/optionsEnabled, long/uniqueId
@@ -1077,6 +1082,8 @@ void carla_bridge::readMessages()
 
 		// uint/size, str[], uint/size, str[], uint/size, str[]
 		case kPluginBridgeNonRtServerSetCustomData: {
+			const uint32_t maxLocalValueLen = clientBridgeVersion >= 10 ? 4096 : 16384;
+
 			// type
 			const BridgeTextReader type(nonRtServerCtrl);
 
@@ -1088,7 +1095,7 @@ void carla_bridge::readMessages()
 				nonRtServerCtrl.readUInt();
 
 			// special case for big values
-			if (valueSize > 16384)
+			if (valueSize > maxLocalValueLen)
 			{
 				const BridgeTextReader bigValueFilePath(nonRtServerCtrl, valueSize);
 
