@@ -50,8 +50,8 @@ void carla_priv_destroy(struct carla_priv *carla);
 
 void carla_priv_activate(struct carla_priv *carla);
 void carla_priv_deactivate(struct carla_priv *carla);
-void carla_priv_process_audio(struct carla_priv *carla, float *buffers[MAX_AV_PLANES],
-			      uint32_t frames);
+void carla_priv_process_audio(struct carla_priv *carla,
+			      float *buffers[MAX_AV_PLANES], uint32_t frames);
 
 void carla_priv_idle(struct carla_priv *carla);
 

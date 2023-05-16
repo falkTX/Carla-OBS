@@ -29,40 +29,42 @@
 // ----------------------------------------------------------------------------
 
 #ifndef CARLA_OS_WIN
-static QString findWinePrefix(const QString filename, const int recursionLimit = 10)
+static QString findWinePrefix(const QString filename,
+			      const int recursionLimit = 10)
 {
-    if (recursionLimit == 0 || filename.length() < 5)
-        return {};
+	if (recursionLimit == 0 || filename.length() < 5)
+		return {};
 
-    const int lastSep = filename.lastIndexOf('/');
-    if (lastSep < 0)
-        return {};
+	const int lastSep = filename.lastIndexOf('/');
+	if (lastSep < 0)
+		return {};
 
-    const QString path(filename.left(lastSep));
+	const QString path(filename.left(lastSep));
 
-    if (QFileInfo(path + "/dosdevices").isDir())
-        return path;
+	if (QFileInfo(path + "/dosdevices").isDir())
+		return path;
 
-    return findWinePrefix(path, recursionLimit - 1);
+	return findWinePrefix(path, recursionLimit - 1);
 }
 #endif
 
 // ----------------------------------------------------------------------------
 
 struct BridgeTextReader {
-	char* text = nullptr;
+	char *text = nullptr;
 
-	BridgeTextReader(BridgeNonRtServerControl& nonRtServerCtrl)
+	BridgeTextReader(BridgeNonRtServerControl &nonRtServerCtrl)
 	{
 		const uint32_t size = nonRtServerCtrl.readUInt();
-		CARLA_SAFE_ASSERT_RETURN(size != 0,);
+		CARLA_SAFE_ASSERT_RETURN(size != 0, );
 
 		text = new char[size + 1];
 		nonRtServerCtrl.readCustomData(text, size);
 		text[size] = '\0';
 	}
 
-	BridgeTextReader(BridgeNonRtServerControl& nonRtServerCtrl, const uint32_t size)
+	BridgeTextReader(BridgeNonRtServerControl &nonRtServerCtrl,
+			 const uint32_t size)
 	{
 		text = new char[size + 1];
 
@@ -72,10 +74,7 @@ struct BridgeTextReader {
 		text[size] = '\0';
 	}
 
-	~BridgeTextReader() noexcept
-	{
-		delete[] text;
-	}
+	~BridgeTextReader() noexcept { delete[] text; }
 
 	CARLA_DECLARE_NON_COPYABLE(BridgeTextReader)
 };
@@ -101,10 +100,13 @@ void BridgeProcess::stop()
 		waitForFinished(2000);
 
 		if (state() != QProcess::NotRunning) {
-			blog(LOG_INFO, "[" CARLA_MODULE_ID "] bridge refused to close, force kill now");
+			blog(LOG_INFO,
+			     "[" CARLA_MODULE_ID
+			     "] bridge refused to close, force kill now");
 			kill();
 		} else {
-			blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] bridge auto-closed successfully");
+			blog(LOG_DEBUG, "[" CARLA_MODULE_ID
+					"] bridge auto-closed successfully");
 		}
 	}
 
@@ -118,24 +120,31 @@ bool carla_bridge::init(uint32_t maxBufferSize, double sampleRate)
 	std::srand(static_cast<uint>(std::time(nullptr)));
 
 	if (!audiopool.initializeServer()) {
-		blog(LOG_WARNING, "[" CARLA_MODULE_ID "] Failed to initialize shared memory audio pool");
+		blog(LOG_WARNING,
+		     "[" CARLA_MODULE_ID
+		     "] Failed to initialize shared memory audio pool");
 		return false;
 	}
 
 	audiopool.resize(maxBufferSize, MAX_AV_PLANES, MAX_AV_PLANES);
 
 	if (!rtClientCtrl.initializeServer()) {
-		blog(LOG_WARNING, "[" CARLA_MODULE_ID "] Failed to initialize RT client control");
+		blog(LOG_WARNING, "[" CARLA_MODULE_ID
+				  "] Failed to initialize RT client control");
 		goto fail1;
 	}
 
 	if (!nonRtClientCtrl.initializeServer()) {
-		blog(LOG_WARNING, "[" CARLA_MODULE_ID "] Failed to initialize Non-RT client control");
+		blog(LOG_WARNING,
+		     "[" CARLA_MODULE_ID
+		     "] Failed to initialize Non-RT client control");
 		goto fail2;
 	}
 
 	if (!nonRtServerCtrl.initializeServer()) {
-		blog(LOG_WARNING, "[" CARLA_MODULE_ID "] Failed to initialize Non-RT server control");
+		blog(LOG_WARNING,
+		     "[" CARLA_MODULE_ID
+		     "] Failed to initialize Non-RT server control");
 		goto fail3;
 	}
 
@@ -189,7 +198,8 @@ bool carla_bridge::init(uint32_t maxBufferSize, double sampleRate)
 
 	bufferSize = maxBufferSize;
 	timedOut = false;
-	blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] init bridge with %u buffer size", bufferSize);
+	blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] init bridge with %u buffer size",
+	     bufferSize);
 
 	return true;
 
@@ -222,11 +232,12 @@ void carla_bridge::cleanup()
 
 			if (!timedOut)
 				wait("stopping", 3000);
-		}
-		else {
+		} else {
 			// forced quit, may have crashed
 			if (proc->exitStatus() == QProcess::CrashExit) {
-				blog(LOG_WARNING, "[" CARLA_MODULE_ID "] carla_bridge::cleanup() - bridge crashed");
+				blog(LOG_WARNING,
+				     "[" CARLA_MODULE_ID
+				     "] carla_bridge::cleanup() - bridge crashed");
 
 				/*
 				QMessageBox::critical(
@@ -253,10 +264,8 @@ void carla_bridge::cleanup()
 	clear_custom_data();
 }
 
-bool carla_bridge::start(const BinaryType btype,
-			 const PluginType ptype,
-			 const char *label,
-			 const char *filename,
+bool carla_bridge::start(const BinaryType btype, const PluginType ptype,
+			 const char *label, const char *filename,
 			 const int64_t uniqueId)
 {
 	CARLA_SAFE_ASSERT_RETURN(btype != BINARY_NONE, false);
@@ -264,14 +273,10 @@ bool carla_bridge::start(const BinaryType btype,
 
 	CarlaString bridgeBinary(get_carla_bin_path());
 
-	if (btype == BINARY_NATIVE)
-	{
+	if (btype == BINARY_NATIVE) {
 		bridgeBinary += CARLA_OS_SEP_STR "carla-bridge-native";
-	}
-	else
-	{
-		switch (btype)
-		{
+	} else {
+		switch (btype) {
 		case BINARY_POSIX32:
 			bridgeBinary += CARLA_OS_SEP_STR "carla-bridge-posix32";
 			break;
@@ -279,10 +284,12 @@ bool carla_bridge::start(const BinaryType btype,
 			bridgeBinary += CARLA_OS_SEP_STR "carla-bridge-posix64";
 			break;
 		case BINARY_WIN32:
-			bridgeBinary += CARLA_OS_SEP_STR "carla-bridge-win32.exe";
+			bridgeBinary += CARLA_OS_SEP_STR
+				"carla-bridge-win32.exe";
 			break;
 		case BINARY_WIN64:
-			bridgeBinary += CARLA_OS_SEP_STR "carla-bridge-win64.exe";
+			bridgeBinary += CARLA_OS_SEP_STR
+				"carla-bridge-win64.exe";
 			break;
 		default:
 			bridgeBinary.clear();
@@ -290,9 +297,10 @@ bool carla_bridge::start(const BinaryType btype,
 		}
 	}
 
-	if (! os_file_exists(bridgeBinary))
-	{
-		blog(LOG_ERROR, "[" CARLA_MODULE_ID "] Cannot load plugin, the required plugin bridge is not available");
+	if (!os_file_exists(bridgeBinary)) {
+		blog(LOG_ERROR,
+		     "[" CARLA_MODULE_ID
+		     "] Cannot load plugin, the required plugin bridge is not available");
 		return false;
 	}
 
@@ -302,56 +310,59 @@ bool carla_bridge::start(const BinaryType btype,
 
 #ifdef CARLA_OS_MAC
 	// see if this binary needs special help
-	if (ptype == PLUGIN_VST2 || ptype == PLUGIN_VST3)
-	{
-		const char* needsArchBridge = nullptr;
+	if (ptype == PLUGIN_VST2 || ptype == PLUGIN_VST3) {
+		const char *needsArchBridge = nullptr;
 
-		if (const char* const vstBinary = findBinaryInBundle(filename))
-		{
-			#ifdef HAVE_LIBMAGIC
+		if (const char *const vstBinary =
+			    findBinaryInBundle(filename)) {
+#ifdef HAVE_LIBMAGIC
 			const CarlaMagic magic;
-			if (const char* const output = magic.getFileDescription(vstBinary))
-			{
-				blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] VST binary magic output is '%s'", output);
-				#ifdef __aarch64__
-				if (std::strstr(output, "arm64") == nullptr && std::strstr(output, "x86_64") != nullptr)
+			if (const char *const output =
+				    magic.getFileDescription(vstBinary)) {
+				blog(LOG_DEBUG,
+				     "[" CARLA_MODULE_ID
+				     "] VST binary magic output is '%s'",
+				     output);
+#ifdef __aarch64__
+				if (std::strstr(output, "arm64") == nullptr &&
+				    std::strstr(output, "x86_64") != nullptr)
 					needsArchBridge = "x86_64";
-				#else
-				if (std::strstr(output, "x86_64") == nullptr && std::strstr(output, "arm64") != nullptr)
+#else
+				if (std::strstr(output, "x86_64") == nullptr &&
+				    std::strstr(output, "arm64") != nullptr)
 					needsArchBridge = "arm64";
-				#endif
+#endif
+			} else {
+				blog(LOG_DEBUG,
+				     "[" CARLA_MODULE_ID
+				     "] VST binary magic output is null");
 			}
-			else
-			{
-				blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] VST binary magic output is null");
-			}
-			#elif __aarch64__
+#elif __aarch64__
 			// if libmagic is not available, lets at least cover the case of x86_64 plugins under arm64 systems
-			if (FILE* const f = fopen(vstBinary, "r"))
-			{
+			if (FILE *const f = fopen(vstBinary, "r")) {
 				uint8_t buf[8];
-				if (fread(buf, 8, 1, f) == 1)
-				{
-					const uint32_t magic = *(uint32_t*)buf;
-					if (magic == 0xfeedfacf && buf[4] == 0x07)
+				if (fread(buf, 8, 1, f) == 1) {
+					const uint32_t magic = *(uint32_t *)buf;
+					if (magic == 0xfeedfacf &&
+					    buf[4] == 0x07)
 						needsArchBridge = "x86_64";
 				}
 				fclose(f);
 			}
-			#endif
-		}
-		else
-		{
-			blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] Search for binary in VST bundle failed");
+#endif
+		} else {
+			blog(LOG_DEBUG,
+			     "[" CARLA_MODULE_ID
+			     "] Search for binary in VST bundle failed");
 		}
 
-		if (needsArchBridge)
-		{
+		if (needsArchBridge) {
 			// TODO we need to hook into qprocess for:
 			// posix_spawnattr_setbinpref_np + CPU_TYPE_ARM64 | CPU_TYPE_X86_64
 			arguments.append("-arch");
 			arguments.append(needsArchBridge);
-			arguments.append(QString::fromUtf8(bridgeBinary.buffer()));
+			arguments.append(
+				QString::fromUtf8(bridgeBinary.buffer()));
 			bridgeBinary = "arch";
 		}
 	}
@@ -359,18 +370,18 @@ bool carla_bridge::start(const BinaryType btype,
 
 #ifndef CARLA_OS_WIN
 	// start with "wine" if needed
-	if (bridgeBinary.endsWith(".exe"))
-	{
+	if (bridgeBinary.endsWith(".exe")) {
 		arguments.append(QString::fromUtf8(bridgeBinary.buffer()));
 		bridgeBinary = "wine";
 
 		winePrefix = findWinePrefix(filename);
 
-		if (winePrefix.isEmpty())
-		{
-			const char* const envWinePrefix = std::getenv("WINEPREFIX");
+		if (winePrefix.isEmpty()) {
+			const char *const envWinePrefix =
+				std::getenv("WINEPREFIX");
 
-			if (envWinePrefix != nullptr && envWinePrefix[0] != '\0')
+			if (envWinePrefix != nullptr &&
+			    envWinePrefix[0] != '\0')
 				winePrefix = envWinePrefix;
 			else
 				winePrefix = QDir::homePath() + "/.wine";
@@ -397,20 +408,24 @@ bool carla_bridge::start(const BinaryType btype,
 	arguments.append(QString::number(uniqueId));
 
 	{
-		QProcessEnvironment env(QProcessEnvironment::systemEnvironment());
+		QProcessEnvironment env(
+			QProcessEnvironment::systemEnvironment());
 		env.insert("ENGINE_BRIDGE_SHM_IDS", shmIdsStr);
 		proc->setProcessEnvironment(env);
 	}
 
-	blog(LOG_INFO, "[" CARLA_MODULE_ID "] Starting plugin bridge, command is:\n%s \"%s\" \"%s\" \"%s\" " P_INT64,
-		bridgeBinary.buffer(), getPluginTypeAsString(ptype), filename,
-		label, uniqueId);
+	blog(LOG_INFO,
+	     "[" CARLA_MODULE_ID
+	     "] Starting plugin bridge, command is:\n%s \"%s\" \"%s\" \"%s\" " P_INT64,
+	     bridgeBinary.buffer(), getPluginTypeAsString(ptype), filename,
+	     label, uniqueId);
 
 	proc->setProgram(QString::fromUtf8(bridgeBinary.buffer()));
 	proc->setArguments(arguments);
 	QMetaObject::invokeMethod(proc, "start");
 
-	const bool started = proc->waitForStarted(5000) && proc->state() == QProcess::Running;
+	const bool started = proc->waitForStarted(5000) &&
+			     proc->state() == QProcess::Running;
 
 	if (!started) {
 		blog(LOG_INFO, "[" CARLA_MODULE_ID "] failed!");
@@ -423,13 +438,15 @@ bool carla_bridge::start(const BinaryType btype,
 	ready = false;
 	timedOut = false;
 
-	while (proc != nullptr && proc->state() == QProcess::Running && !ready) {
+	while (proc != nullptr && proc->state() == QProcess::Running &&
+	       !ready) {
 		readMessages();
 		carla_msleep(5);
 	}
 
-	if (! ready) {
-		blog(LOG_WARNING, "[" CARLA_MODULE_ID "] failed to start plugin bridge");
+	if (!ready) {
+		blog(LOG_WARNING,
+		     "[" CARLA_MODULE_ID "] failed to start plugin bridge");
 		QMetaObject::invokeMethod(proc, "stop");
 		return false;
 	}
@@ -451,7 +468,8 @@ bool carla_bridge::start(const BinaryType btype,
 
 bool carla_bridge::isRunning() const
 {
-	return childprocess != nullptr && childprocess->state() == QProcess::Running;
+	return childprocess != nullptr &&
+	       childprocess->state() == QProcess::Running;
 }
 
 bool carla_bridge::isReady() const noexcept
@@ -474,7 +492,8 @@ bool carla_bridge::idle()
 	}
 	case QProcess::NotRunning:
 		//         fTimedError = true;
-		blog(LOG_INFO, "[" CARLA_MODULE_ID "] bridge closed by itself!");
+		blog(LOG_INFO,
+		     "[" CARLA_MODULE_ID "] bridge closed by itself!");
 		// activated = false;
 		timedOut = true;
 		cleanup();
@@ -503,7 +522,8 @@ bool carla_bridge::wait(const char *const action, const uint msecs)
 		return true;
 
 	timedOut = true;
-	blog(LOG_WARNING, "[" CARLA_MODULE_ID "] waitForClient(%s) timed out", action);
+	blog(LOG_WARNING, "[" CARLA_MODULE_ID "] waitForClient(%s) timed out",
+	     action);
 	return false;
 }
 
@@ -610,28 +630,27 @@ void carla_bridge::process(float *buffers[MAX_AV_PLANES], uint32_t frames)
 
 	if (wait("process", 1000)) {
 		for (uint32_t c = 0; c < MAX_AV_PLANES; ++c)
-			carla_copyFloats(buffers[c],
-					 audiopool.data + ((c + info.numAudioIns) *
-							   bufferSize),
-					 frames);
+			carla_copyFloats(
+				buffers[c],
+				audiopool.data +
+					((c + info.numAudioIns) * bufferSize),
+				frames);
 	}
 }
 
-void carla_bridge::add_custom_data(const char* const type,
-				   const char* const key,
-				   const char* const value,
+void carla_bridge::add_custom_data(const char *const type,
+				   const char *const key,
+				   const char *const value,
 				   const bool sendToPlugin)
 {
-	CARLA_SAFE_ASSERT_RETURN(type != nullptr && type[0] != '\0',);
-	CARLA_SAFE_ASSERT_RETURN(key != nullptr && key[0] != '\0',);
-	CARLA_SAFE_ASSERT_RETURN(value != nullptr,);
+	CARLA_SAFE_ASSERT_RETURN(type != nullptr && type[0] != '\0', );
+	CARLA_SAFE_ASSERT_RETURN(key != nullptr && key[0] != '\0', );
+	CARLA_SAFE_ASSERT_RETURN(value != nullptr, );
 
 	// Check if we already have this key
-	for (CustomData& cdata : customData)
-	{
-		if (std::strcmp(cdata.key, key) == 0)
-		{
-			bfree(const_cast<char*>(cdata.value));
+	for (CustomData &cdata : customData) {
+		if (std::strcmp(cdata.key, key) == 0) {
+			bfree(const_cast<char *>(cdata.value));
 			cdata.value = bstrdup(value);
 			return;
 		}
@@ -639,25 +658,28 @@ void carla_bridge::add_custom_data(const char* const type,
 
 	// Otherwise store it
 	CustomData cdata = {};
-	cdata.type  = bstrdup(type);
-	cdata.key   = bstrdup(key);
+	cdata.type = bstrdup(type);
+	cdata.key = bstrdup(key);
 	cdata.value = bstrdup(value);
 	customData.push_back(cdata);
 
-	if (sendToPlugin)
-	{
-		const uint32_t maxLocalValueLen = clientBridgeVersion >= 10 ? 4096 : 16384;
+	if (sendToPlugin) {
+		const uint32_t maxLocalValueLen =
+			clientBridgeVersion >= 10 ? 4096 : 16384;
 
-		const uint32_t typeLen  = static_cast<uint32_t>(std::strlen(type));
-		const uint32_t keyLen   = static_cast<uint32_t>(std::strlen(key));
-		const uint32_t valueLen = static_cast<uint32_t>(std::strlen(value));
+		const uint32_t typeLen =
+			static_cast<uint32_t>(std::strlen(type));
+		const uint32_t keyLen = static_cast<uint32_t>(std::strlen(key));
+		const uint32_t valueLen =
+			static_cast<uint32_t>(std::strlen(value));
 
 		const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
 
 		if (valueLen > maxLocalValueLen)
 			nonRtClientCtrl.waitIfDataIsReachingLimit();
 
-		nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientSetCustomData);
+		nonRtClientCtrl.writeOpcode(
+			kPluginBridgeNonRtClientSetCustomData);
 
 		nonRtClientCtrl.writeUInt(typeLen);
 		nonRtClientCtrl.writeCustomData(type, typeLen);
@@ -667,32 +689,32 @@ void carla_bridge::add_custom_data(const char* const type,
 
 		nonRtClientCtrl.writeUInt(valueLen);
 
-		if (valueLen > 0)
-		{
-			if (valueLen > maxLocalValueLen)
-			{
+		if (valueLen > 0) {
+			if (valueLen > maxLocalValueLen) {
 				QString filePath(QDir::tempPath());
 
-				filePath += CARLA_OS_SEP_STR ".CarlaCustomData_";
+				filePath += CARLA_OS_SEP_STR
+					".CarlaCustomData_";
 				filePath += audiopool.getFilenameSuffix();
 
 				QFile file(filePath);
-				if (file.open(QIODevice::WriteOnly)
-					&& file.write(value) != static_cast<qint64>(valueLen))
-				{
-					const uint32_t ulength = static_cast<uint32_t>(filePath.length());
+				if (file.open(QIODevice::WriteOnly) &&
+				    file.write(value) !=
+					    static_cast<qint64>(valueLen)) {
+					const uint32_t ulength =
+						static_cast<uint32_t>(
+							filePath.length());
 
 					nonRtClientCtrl.writeUInt(ulength);
-					nonRtClientCtrl.writeCustomData(filePath.toUtf8().constData(), ulength);
-				}
-				else
-				{
+					nonRtClientCtrl.writeCustomData(
+						filePath.toUtf8().constData(),
+						ulength);
+				} else {
 					nonRtClientCtrl.writeUInt(0);
 				}
-			}
-			else
-			{
-				nonRtClientCtrl.writeCustomData(value, valueLen);
+			} else {
+				nonRtClientCtrl.writeCustomData(value,
+								valueLen);
 			}
 		}
 
@@ -712,11 +734,10 @@ void carla_bridge::custom_data_loaded()
 
 void carla_bridge::clear_custom_data()
 {
-	for (CustomData& cdata : customData)
-	{
-		bfree(const_cast<char*>(cdata.type));
-		bfree(const_cast<char*>(cdata.key));
-		bfree(const_cast<char*>(cdata.value));
+	for (CustomData &cdata : customData) {
+		bfree(const_cast<char *>(cdata.type));
+		bfree(const_cast<char *>(cdata.key));
+		bfree(const_cast<char *>(cdata.value));
 	}
 	customData.clear();
 }
@@ -731,17 +752,19 @@ void carla_bridge::load_chunk(const char *b64chunk)
 	filePath += audiopool.getFilenameSuffix();
 
 	QFile file(filePath);
-	if (file.open(QIODevice::WriteOnly) && file.write(b64chunk) != 0)
-	{
+	if (file.open(QIODevice::WriteOnly) && file.write(b64chunk) != 0) {
 		file.close();
 
-		const uint32_t ulength = static_cast<uint32_t>(filePath.length());
+		const uint32_t ulength =
+			static_cast<uint32_t>(filePath.length());
 
 		const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
 
-		nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientSetChunkDataFile);
+		nonRtClientCtrl.writeOpcode(
+			kPluginBridgeNonRtClientSetChunkDataFile);
 		nonRtClientCtrl.writeUInt(ulength);
-		nonRtClientCtrl.writeCustomData(filePath.toUtf8().constData(), ulength);
+		nonRtClientCtrl.writeCustomData(filePath.toUtf8().constData(),
+						ulength);
 		nonRtClientCtrl.commitWrite();
 
 		nonRtClientCtrl.waitIfDataIsReachingLimit();
@@ -762,18 +785,18 @@ void carla_bridge::save_and_wait()
 		nonRtClientCtrl.commitWrite();
 
 		// tell plugin bridge to save and report any pending data
-		nonRtClientCtrl.writeOpcode(kPluginBridgeNonRtClientPrepareForSave);
+		nonRtClientCtrl.writeOpcode(
+			kPluginBridgeNonRtClientPrepareForSave);
 		nonRtClientCtrl.commitWrite();
 	}
 
-	while (childprocess != nullptr && childprocess->state() == QProcess::Running && !saved)
-	{
+	while (childprocess != nullptr &&
+	       childprocess->state() == QProcess::Running && !saved) {
 		readMessages();
 		carla_msleep(5);
 	}
 
-	if (isRunning())
-	{
+	if (isRunning()) {
 		const CarlaMutexLocker _cml(nonRtClientCtrl.mutex);
 
 		// reactivate ping check
@@ -793,11 +816,10 @@ void carla_bridge::readMessages()
 
 		// #ifdef DEBUG
 		if (opcode != kPluginBridgeNonRtServerPong &&
-			opcode != kPluginBridgeNonRtServerParameterValue2) {
+		    opcode != kPluginBridgeNonRtServerParameterValue2) {
 			blog(LOG_DEBUG,
-				"carla_bridge::readMessages() - got opcode: %s",
-				PluginBridgeNonRtServerOpcode2str(
-					opcode));
+			     "carla_bridge::readMessages() - got opcode: %s",
+			     PluginBridgeNonRtServerOpcode2str(opcode));
 		}
 		// #endif
 
@@ -817,20 +839,22 @@ void carla_bridge::readMessages()
 
 			// const uint32_t category =
 			nonRtServerCtrl.readUInt();
-			info.hints = nonRtServerCtrl.readUInt() | PLUGIN_IS_BRIDGE;
+			info.hints = nonRtServerCtrl.readUInt() |
+				     PLUGIN_IS_BRIDGE;
 			// const uint32_t optionAv =
 			nonRtServerCtrl.readUInt();
 			info.options = nonRtServerCtrl.readUInt();
-			const int64_t uniqueId =
-				nonRtServerCtrl.readLong();
+			const int64_t uniqueId = nonRtServerCtrl.readLong();
 
 			if (info.uniqueId != 0) {
-				CARLA_SAFE_ASSERT_INT2(info.uniqueId == uniqueId, info.uniqueId, uniqueId);
+				CARLA_SAFE_ASSERT_INT2(info.uniqueId ==
+							       uniqueId,
+						       info.uniqueId, uniqueId);
 			}
 
-			#if 0 // def HAVE_X11
+#if 0 // def HAVE_X11
 			// if (fBridgeVersion < 9 || fBinaryType == BINARY_WIN32 || fBinaryType == BINARY_WIN64)
-			#endif
+#endif
 			{
 				info.hints &= ~PLUGIN_HAS_CUSTOM_EMBED_UI;
 			}
@@ -880,8 +904,7 @@ void carla_bridge::readMessages()
 			delete[] paramDetails;
 
 			if (paramCount != 0)
-				paramDetails =
-					new carla_param_data[paramCount];
+				paramDetails = new carla_param_data[paramCount];
 			else
 				paramDetails = nullptr;
 		} break;
@@ -909,24 +932,21 @@ void carla_bridge::readMessages()
 
 		// uint/index, int/rindex, uint/type, uint/hints, short/cc
 		case kPluginBridgeNonRtServerParameterData1: {
-			const uint32_t index =
-				nonRtServerCtrl.readUInt();
+			const uint32_t index = nonRtServerCtrl.readUInt();
 			nonRtServerCtrl.readInt();
-			const uint32_t type =
-				nonRtServerCtrl.readUInt();
-			const uint32_t hints =
-				nonRtServerCtrl.readUInt();
+			const uint32_t type = nonRtServerCtrl.readUInt();
+			const uint32_t hints = nonRtServerCtrl.readUInt();
 			nonRtServerCtrl.readShort();
 
-			CARLA_SAFE_ASSERT_UINT2_BREAK(
-				index < paramCount, index, paramCount);
+			CARLA_SAFE_ASSERT_UINT2_BREAK(index < paramCount, index,
+						      paramCount);
 
 			if (type != PARAMETER_INPUT)
 				break;
 			if ((hints & PARAMETER_IS_ENABLED) == 0)
 				break;
-			if (hints & (PARAMETER_IS_READ_ONLY |
-					PARAMETER_IS_NOT_SAVED))
+			if (hints &
+			    (PARAMETER_IS_READ_ONLY | PARAMETER_IS_NOT_SAVED))
 				break;
 
 			paramDetails[index].hints = hints;
@@ -934,8 +954,7 @@ void carla_bridge::readMessages()
 
 		// uint/index, uint/size, str[] (name), uint/size, str[] (unit)
 		case kPluginBridgeNonRtServerParameterData2: {
-			const uint32_t index =
-				nonRtServerCtrl.readUInt();
+			const uint32_t index = nonRtServerCtrl.readUInt();
 
 			// name
 			const BridgeTextReader name(nonRtServerCtrl);
@@ -946,11 +965,10 @@ void carla_bridge::readMessages()
 			// unit
 			const BridgeTextReader unit(nonRtServerCtrl);
 
-			CARLA_SAFE_ASSERT_UINT2_BREAK(
-				index < paramCount, index, paramCount);
+			CARLA_SAFE_ASSERT_UINT2_BREAK(index < paramCount, index,
+						      paramCount);
 
-			if (paramDetails[index].hints &
-				PARAMETER_IS_ENABLED) {
+			if (paramDetails[index].hints & PARAMETER_IS_ENABLED) {
 				paramDetails[index].name = name.text;
 				paramDetails[index].symbol = symbol.text;
 				paramDetails[index].unit = unit.text;
@@ -959,8 +977,7 @@ void carla_bridge::readMessages()
 
 		// uint/index, float/def, float/min, float/max, float/step, float/stepSmall, float/stepLarge
 		case kPluginBridgeNonRtServerParameterRanges: {
-			const uint32_t index =
-				nonRtServerCtrl.readUInt();
+			const uint32_t index = nonRtServerCtrl.readUInt();
 			const float def = nonRtServerCtrl.readFloat();
 			const float min = nonRtServerCtrl.readFloat();
 			const float max = nonRtServerCtrl.readFloat();
@@ -971,11 +988,10 @@ void carla_bridge::readMessages()
 			CARLA_SAFE_ASSERT_BREAK(min < max);
 			CARLA_SAFE_ASSERT_BREAK(def >= min);
 			CARLA_SAFE_ASSERT_BREAK(def <= max);
-			CARLA_SAFE_ASSERT_UINT2_BREAK(
-				index < paramCount, index, paramCount);
+			CARLA_SAFE_ASSERT_UINT2_BREAK(index < paramCount, index,
+						      paramCount);
 
-			if (paramDetails[index].hints &
-				PARAMETER_IS_ENABLED) {
+			if (paramDetails[index].hints & PARAMETER_IS_ENABLED) {
 				paramDetails[index].def =
 					paramDetails[index].value = def;
 				paramDetails[index].min = min;
@@ -986,34 +1002,26 @@ void carla_bridge::readMessages()
 
 		// uint/index, float/value
 		case kPluginBridgeNonRtServerParameterValue: {
-			const uint32_t index =
-				nonRtServerCtrl.readUInt();
+			const uint32_t index = nonRtServerCtrl.readUInt();
 			const float value = nonRtServerCtrl.readFloat();
 
 			if (index < paramCount) {
-				const float fixedValue =
-					carla_fixedValue(
-						paramDetails[index].min,
-						paramDetails[index].max,
-						value);
+				const float fixedValue = carla_fixedValue(
+					paramDetails[index].min,
+					paramDetails[index].max, value);
 
-				if (carla_isNotEqual(
-						paramDetails[index].value,
-						fixedValue)) {
-					paramDetails[index].value =
-						fixedValue;
+				if (carla_isNotEqual(paramDetails[index].value,
+						     fixedValue)) {
+					paramDetails[index].value = fixedValue;
 
 					if (callback != nullptr) {
 						// skip parameters that we do not show
-						if ((paramDetails[index]
-								.hints &
-							PARAMETER_IS_ENABLED) ==
-							0)
+						if ((paramDetails[index].hints &
+						     PARAMETER_IS_ENABLED) == 0)
 							break;
 
 						callback->bridge_parameter_changed(
-							index,
-							fixedValue);
+							index, fixedValue);
 					}
 				}
 			}
@@ -1021,16 +1029,13 @@ void carla_bridge::readMessages()
 
 		// uint/index, float/value
 		case kPluginBridgeNonRtServerParameterValue2: {
-			const uint32_t index =
-				nonRtServerCtrl.readUInt();
+			const uint32_t index = nonRtServerCtrl.readUInt();
 			const float value = nonRtServerCtrl.readFloat();
 
 			if (index < paramCount) {
-				const float fixedValue =
-					carla_fixedValue(
-						paramDetails[index].min,
-						paramDetails[index].max,
-						value);
+				const float fixedValue = carla_fixedValue(
+					paramDetails[index].min,
+					paramDetails[index].max, value);
 				paramDetails[index].value = fixedValue;
 			}
 		} break;
@@ -1043,8 +1048,7 @@ void carla_bridge::readMessages()
 
 		// uint/index, float/value
 		case kPluginBridgeNonRtServerDefaultValue: {
-			const uint32_t index =
-				nonRtServerCtrl.readUInt();
+			const uint32_t index = nonRtServerCtrl.readUInt();
 			const float value = nonRtServerCtrl.readFloat();
 
 			if (index < paramCount)
@@ -1082,7 +1086,8 @@ void carla_bridge::readMessages()
 
 		// uint/size, str[], uint/size, str[], uint/size, str[]
 		case kPluginBridgeNonRtServerSetCustomData: {
-			const uint32_t maxLocalValueLen = clientBridgeVersion >= 10 ? 4096 : 16384;
+			const uint32_t maxLocalValueLen =
+				clientBridgeVersion >= 10 ? 4096 : 16384;
 
 			// type
 			const BridgeTextReader type(nonRtServerCtrl);
@@ -1091,47 +1096,63 @@ void carla_bridge::readMessages()
 			const BridgeTextReader key(nonRtServerCtrl);
 
 			// value
-			const uint32_t valueSize =
-				nonRtServerCtrl.readUInt();
+			const uint32_t valueSize = nonRtServerCtrl.readUInt();
 
 			// special case for big values
-			if (valueSize > maxLocalValueLen)
-			{
-				const BridgeTextReader bigValueFilePath(nonRtServerCtrl, valueSize);
+			if (valueSize > maxLocalValueLen) {
+				const BridgeTextReader bigValueFilePath(
+					nonRtServerCtrl, valueSize);
 
-				QString realBigValueFilePath(QString::fromUtf8(bigValueFilePath.text));
+				QString realBigValueFilePath(QString::fromUtf8(
+					bigValueFilePath.text));
 
-				#ifndef CARLA_OS_WIN
+#ifndef CARLA_OS_WIN
 				// Using Wine, fix temp dir
-				if (info.btype == BINARY_WIN32 || info.btype == BINARY_WIN64)
-				{
-					const QStringList driveLetterSplit(realBigValueFilePath.split(':'));
-					blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] big value save path BEFORE => %s", realBigValueFilePath.toUtf8().constData());
+				if (info.btype == BINARY_WIN32 ||
+				    info.btype == BINARY_WIN64) {
+					const QStringList driveLetterSplit(
+						realBigValueFilePath.split(
+							':'));
+					blog(LOG_DEBUG,
+					     "[" CARLA_MODULE_ID
+					     "] big value save path BEFORE => %s",
+					     realBigValueFilePath.toUtf8()
+						     .constData());
 
-					realBigValueFilePath  = winePrefix;
+					realBigValueFilePath = winePrefix;
 					realBigValueFilePath += "/drive_";
-					realBigValueFilePath += driveLetterSplit[0].toLower();
-					realBigValueFilePath += driveLetterSplit[1];
+					realBigValueFilePath +=
+						driveLetterSplit[0].toLower();
+					realBigValueFilePath +=
+						driveLetterSplit[1];
 
-					realBigValueFilePath  = realBigValueFilePath.replace('\\', '/');
-					blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] big value save path AFTER => %s", realBigValueFilePath.toUtf8().constData());
+					realBigValueFilePath =
+						realBigValueFilePath.replace(
+							'\\', '/');
+					blog(LOG_DEBUG,
+					     "[" CARLA_MODULE_ID
+					     "] big value save path AFTER => %s",
+					     realBigValueFilePath.toUtf8()
+						     .constData());
 				}
-				#endif
+#endif
 
 				QFile bigValueFile(realBigValueFilePath);
 				CARLA_SAFE_ASSERT_BREAK(bigValueFile.exists());
 
-				if (bigValueFile.open(QIODevice::ReadOnly))
-				{
-					add_custom_data(type.text, key.text, bigValueFile.readAll().constData(), false);
+				if (bigValueFile.open(QIODevice::ReadOnly)) {
+					add_custom_data(type.text, key.text,
+							bigValueFile.readAll()
+								.constData(),
+							false);
 					bigValueFile.remove();
 				}
-			}
-			else
-			{
-				const BridgeTextReader value(nonRtServerCtrl, valueSize);
+			} else {
+				const BridgeTextReader value(nonRtServerCtrl,
+							     valueSize);
 
-				add_custom_data(type.text, key.text, value.text, false);
+				add_custom_data(type.text, key.text, value.text,
+						false);
 			}
 
 		} break;
@@ -1141,31 +1162,41 @@ void carla_bridge::readMessages()
 			// chunkFilePath
 			const BridgeTextReader chunkFilePath(nonRtServerCtrl);
 
-			QString realChunkFilePath(QString::fromUtf8(chunkFilePath.text));
+			QString realChunkFilePath(
+				QString::fromUtf8(chunkFilePath.text));
 
-			#ifndef CARLA_OS_WIN
+#ifndef CARLA_OS_WIN
 			// Using Wine, fix temp dir
-			if (info.btype == BINARY_WIN32 || info.btype == BINARY_WIN64)
-			{
-				const QStringList driveLetterSplit(realChunkFilePath.split(':'));
-				blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] chunk save path BEFORE => %s", realChunkFilePath.toUtf8().constData());
+			if (info.btype == BINARY_WIN32 ||
+			    info.btype == BINARY_WIN64) {
+				const QStringList driveLetterSplit(
+					realChunkFilePath.split(':'));
+				blog(LOG_DEBUG,
+				     "[" CARLA_MODULE_ID
+				     "] chunk save path BEFORE => %s",
+				     realChunkFilePath.toUtf8().constData());
 
-				realChunkFilePath  = winePrefix;
+				realChunkFilePath = winePrefix;
 				realChunkFilePath += "/drive_";
-				realChunkFilePath += driveLetterSplit[0].toLower();
+				realChunkFilePath +=
+					driveLetterSplit[0].toLower();
 				realChunkFilePath += driveLetterSplit[1];
 
-				realChunkFilePath  = realChunkFilePath.replace('\\', '/');
-				blog(LOG_DEBUG, "[" CARLA_MODULE_ID "] chunk save path AFTER => %s", realChunkFilePath.toUtf8().constData());
+				realChunkFilePath =
+					realChunkFilePath.replace('\\', '/');
+				blog(LOG_DEBUG,
+				     "[" CARLA_MODULE_ID
+				     "] chunk save path AFTER => %s",
+				     realChunkFilePath.toUtf8().constData());
 			}
-			#endif
+#endif
 
 			QFile chunkFile(realChunkFilePath);
 			CARLA_SAFE_ASSERT_BREAK(chunkFile.exists());
 
-			if (chunkFile.open(QIODevice::ReadOnly))
-			{
-				chunk = QByteArray::fromBase64(chunkFile.readAll());
+			if (chunkFile.open(QIODevice::ReadOnly)) {
+				chunk = QByteArray::fromBase64(
+					chunkFile.readAll());
 				chunkFile.remove();
 			}
 		} break;

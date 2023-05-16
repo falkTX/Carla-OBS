@@ -39,16 +39,18 @@ static const struct {
 	const char *res;
 } carla_system_paths[] = {
 #ifdef __APPLE__
-	{ "~/Applications/Carla.app/Contents/MacOS", "~/Applications/Carla.app/Contents/MacOS/resources" },
-	{ "/Applications/Carla.app/Contents/MacOS", "/Applications/Carla.app/Contents/MacOS/resources" },
+	{"~/Applications/Carla.app/Contents/MacOS",
+	 "~/Applications/Carla.app/Contents/MacOS/resources"},
+	{"/Applications/Carla.app/Contents/MacOS",
+	 "/Applications/Carla.app/Contents/MacOS/resources"},
 #endif
-	{ "/usr/local/lib/carla", "/usr/local/share/carla/resources" },
-	{ "/usr/lib/carla", "/usr/share/carla/resources" },
+	{"/usr/local/lib/carla", "/usr/local/share/carla/resources"},
+	{"/usr/lib/carla", "/usr/share/carla/resources"},
 };
 #endif
 
-static char* module_path = NULL;
-static const char* resource_path = NULL;
+static char *module_path = NULL;
+static const char *resource_path = NULL;
 
 #ifdef _WIN32
 static HINSTANCE module_handle = NULL;
@@ -112,9 +114,10 @@ const char *get_carla_bin_path(void)
 #ifdef __APPLE__
 	// if running as app bundle, use its binary dir
 	if (is_in_bundle()) {
-		char *appbundlesep = strstr(mpath, "/PlugIns/carla-bridge.plugin/Contents/MacOS");
+		char *appbundlesep = strstr(
+			mpath, "/PlugIns/carla-bridge.plugin/Contents/MacOS");
 		if (appbundlesep == NULL)
-		    goto free;
+			goto free;
 		strcpy(appbundlesep, "/MacOS");
 	}
 #endif
@@ -130,7 +133,9 @@ free:
 
 fail:
 #ifndef _WIN32
-	for (size_t i = 0; i < sizeof(carla_system_paths)/sizeof(carla_system_paths[0]); ++i) {
+	for (size_t i = 0;
+	     i < sizeof(carla_system_paths) / sizeof(carla_system_paths[0]);
+	     ++i) {
 		if (os_file_exists(carla_system_paths[i].bin)) {
 			module_path = bstrdup(carla_system_paths[i].bin);
 			resource_path = carla_system_paths[i].res;
@@ -148,7 +153,9 @@ const char *get_carla_resource_path(void)
 		return resource_path;
 
 #ifndef _WIN32
-	for (size_t i = 0; i < sizeof(carla_system_paths)/sizeof(carla_system_paths[0]); ++i) {
+	for (size_t i = 0;
+	     i < sizeof(carla_system_paths) / sizeof(carla_system_paths[0]);
+	     ++i) {
 		if (os_file_exists(carla_system_paths[i].res)) {
 			resource_path = carla_system_paths[i].res;
 			break;
@@ -213,8 +220,7 @@ void handle_update_request(obs_source_t *source, uint64_t *update_req)
 
 		signal_handler_t *sighandler =
 			obs_source_get_signal_handler(source);
-		signal_handler_signal(sighandler, "update_properties",
-					NULL);
+		signal_handler_signal(sighandler, "update_properties", NULL);
 	}
 }
 

@@ -268,9 +268,9 @@ struct carla_priv *carla_priv_create(obs_source_t *source,
 	if (priv->handle == NULL)
 		goto fail;
 
-	descriptor->dispatcher(priv->handle,
-			       NATIVE_PLUGIN_OPCODE_HOST_OPTION,
-			       ENGINE_OPTION_PATH_BINARIES, 0, (void*)get_carla_bin_path(), 0.f);
+	descriptor->dispatcher(priv->handle, NATIVE_PLUGIN_OPCODE_HOST_OPTION,
+			       ENGINE_OPTION_PATH_BINARIES, 0,
+			       (void *)get_carla_bin_path(), 0.f);
 
 	return priv;
 
@@ -305,8 +305,8 @@ void carla_priv_deactivate(struct carla_priv *priv)
 	priv->descriptor->deactivate(priv->handle);
 }
 
-void carla_priv_process_audio(struct carla_priv *priv, float *buffers[MAX_AV_PLANES],
-			      uint32_t frames)
+void carla_priv_process_audio(struct carla_priv *priv,
+			      float *buffers[MAX_AV_PLANES], uint32_t frames)
 {
 	priv->timeInfo.usecs = os_gettime_ns() / 1000;
 	priv->descriptor->process(priv->handle, buffers, buffers, frames, NULL,
@@ -439,8 +439,8 @@ static bool carla_priv_show_gui_callback(obs_properties_t *props,
 		 (ulonglong)carla_qt_get_main_window_id());
 	priv->descriptor->dispatcher(priv->handle,
 				     NATIVE_PLUGIN_OPCODE_HOST_OPTION,
-				     ENGINE_OPTION_FRONTEND_WIN_ID,
-				     0, winIdStr, 0.f);
+				     ENGINE_OPTION_FRONTEND_WIN_ID, 0, winIdStr,
+				     0.f);
 
 	const double scaleFactor = carla_qt_get_scale_factor();
 	priv->descriptor->dispatcher(priv->handle,
@@ -504,9 +504,8 @@ void carla_priv_readd_properties(struct carla_priv *priv,
 							  info->ranges.max);
 		} else if (info->hints & NATIVE_PARAMETER_IS_INTEGER) {
 			prop = obs_properties_add_int_slider(
-				props, pname, info->name,
-				(int)info->ranges.min, (int)info->ranges.max,
-				(int)info->ranges.step);
+				props, pname, info->name, (int)info->ranges.min,
+				(int)info->ranges.max, (int)info->ranges.step);
 
 			obs_data_set_default_int(settings, pname,
 						 (int)info->ranges.def);

@@ -51,7 +51,7 @@ struct carla_data {
 // --------------------------------------------------------------------------------------------------------------------
 // private methods
 
-static void* carla_obs_audio_gen_thread(void *data)
+static void *carla_obs_audio_gen_thread(void *data)
 {
 	struct carla_data *carla = data;
 
@@ -69,7 +69,8 @@ static void* carla_obs_audio_gen_thread(void *data)
 	uint64_t total_samples = 0;
 
 	while (carla->audiogen_running) {
-		const uint32_t buffer_size = bufsize_mode_to_frames(carla->buffer_size_mode);
+		const uint32_t buffer_size =
+			bufsize_mode_to_frames(carla->buffer_size_mode);
 
 		out.frames = buffer_size;
 		carla_priv_process_audio(carla->priv, carla->buffers,
@@ -219,8 +220,8 @@ static void carla_obs_activate(void *data)
 	if (carla->audiogen_enabled) {
 		assert(!carla->audiogen_running);
 		carla->audiogen_running = true;
-		pthread_create(&carla->audiogen_thread, NULL, carla_obs_audio_gen_thread,
-			       carla);
+		pthread_create(&carla->audiogen_thread, NULL,
+			       carla_obs_audio_gen_thread, carla);
 	}
 }
 
@@ -246,13 +247,13 @@ static void carla_obs_filter_audio_direct(struct carla_data *carla,
 
 	for (uint32_t i = 0; i < frames;) {
 		const uint32_t stepframes = frames >= MAX_AUDIO_BUFFER_SIZE
-			? MAX_AUDIO_BUFFER_SIZE
-			: frames;
+						    ? MAX_AUDIO_BUFFER_SIZE
+						    : frames;
 
 		for (uint8_t c = 0; c < MAX_AV_PLANES; ++c)
 			obsbuffers[c] = audio->data[c]
-				? ((float *)audio->data[c] + i)
-				: carla->dummybuffer;
+						? ((float *)audio->data[c] + i)
+						: carla->dummybuffer;
 
 		carla_priv_process_audio(carla->priv, obsbuffers, stepframes);
 
@@ -265,7 +266,8 @@ static void carla_obs_filter_audio_direct(struct carla_data *carla,
 static void carla_obs_filter_audio_buffered(struct carla_data *carla,
 					    struct obs_audio_data *audio)
 {
-	const uint32_t buffer_size = bufsize_mode_to_frames(carla->buffer_size_mode);
+	const uint32_t buffer_size =
+		bufsize_mode_to_frames(carla->buffer_size_mode);
 	const size_t channels = carla->channels;
 	const uint32_t frames = audio->frames;
 
@@ -273,7 +275,8 @@ static void carla_obs_filter_audio_buffered(struct carla_data *carla,
 	float *obsbuffers[MAX_AV_PLANES];
 
 	for (uint8_t c = 0; c < MAX_AV_PLANES; ++c)
-		obsbuffers[c] = audio->data[c] ? (float *)audio->data[c] : carla->dummybuffer;
+		obsbuffers[c] = audio->data[c] ? (float *)audio->data[c]
+					       : carla->dummybuffer;
 
 	// preload some variables before looping section
 	uint16_t buffer_head = carla->buffer_head;
@@ -291,7 +294,8 @@ static void carla_obs_filter_audio_buffered(struct carla_data *carla,
 			buffer_head = 0;
 			carla_priv_process_audio(carla->priv, carla->buffers,
 						 buffer_size);
-			memset(carla->dummybuffer, 0, sizeof(float) * buffer_size);
+			memset(carla->dummybuffer, 0,
+			       sizeof(float) * buffer_size);
 
 			// we can now begin to copy back the buffer into OBS
 			if (buffer_tail == UINT16_MAX)
@@ -370,19 +374,23 @@ bool obs_module_load(void)
 	const char *carla_bin_path = get_carla_bin_path();
 	if (!carla_bin_path) {
 		blog(LOG_WARNING,
-		     "[" CARLA_MODULE_ID "] failed to find binaries, will not load module");
+		     "[" CARLA_MODULE_ID
+		     "] failed to find binaries, will not load module");
 		return false;
 	}
-	blog(LOG_INFO, "[" CARLA_MODULE_ID "] using binary path %s", carla_bin_path);
+	blog(LOG_INFO, "[" CARLA_MODULE_ID "] using binary path %s",
+	     carla_bin_path);
 
 #ifndef BUILDING_CARLA_OBS
 	const char *carla_res_path = get_carla_resource_path();
 	if (!carla_res_path) {
 		blog(LOG_WARNING,
-		     "[" CARLA_MODULE_ID "] failed to find resources, will not load module");
+		     "[" CARLA_MODULE_ID
+		     "] failed to find resources, will not load module");
 		return false;
 	}
-	blog(LOG_INFO, "[" CARLA_MODULE_ID "] using resource path %s", carla_res_path);
+	blog(LOG_INFO, "[" CARLA_MODULE_ID "] using resource path %s",
+	     carla_res_path);
 #endif
 
 	static const struct obs_source_info filter = {

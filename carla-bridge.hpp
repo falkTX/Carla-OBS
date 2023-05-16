@@ -23,7 +23,7 @@ CARLA_BACKEND_USE_NAMESPACE
 // ----------------------------------------------------------------------------
 
 class BridgeProcess : public QProcess {
-    Q_OBJECT
+	Q_OBJECT
 
 public:
 	BridgeProcess();
@@ -100,8 +100,8 @@ struct carla_bridge {
 	bool init(uint32_t maxBufferSize, double sampleRate);
 	void cleanup();
 
-	bool start(BinaryType btype, PluginType ptype,
-		   const char *label, const char *filename, int64_t uniqueId);
+	bool start(BinaryType btype, PluginType ptype, const char *label,
+		   const char *filename, int64_t uniqueId);
 	bool isRunning() const;
 	bool isReady() const noexcept;
 
@@ -117,7 +117,8 @@ struct carla_bridge {
 	void deactivate();
 	void process(float *buffers[MAX_AV_PLANES], uint32_t frames);
 
-	void add_custom_data(const char *type, const char *key, const char *value, bool sendToPlugin);
+	void add_custom_data(const char *type, const char *key,
+			     const char *value, bool sendToPlugin);
 	void custom_data_loaded();
 	void clear_custom_data();
 

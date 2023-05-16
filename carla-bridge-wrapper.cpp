@@ -127,17 +127,17 @@ void carla_priv_save(struct carla_priv *priv, obs_data_t *settings)
 {
 	priv->bridge.save_and_wait();
 
-	obs_data_set_string(settings, "btype", getBinaryTypeAsString(priv->bridge.info.btype));
-	obs_data_set_string(settings, "ptype", getPluginTypeAsString(priv->bridge.info.ptype));
+	obs_data_set_string(settings, "btype",
+			    getBinaryTypeAsString(priv->bridge.info.btype));
+	obs_data_set_string(settings, "ptype",
+			    getPluginTypeAsString(priv->bridge.info.ptype));
 	obs_data_set_string(settings, "filename", priv->bridge.info.filename);
 	obs_data_set_string(settings, "label", priv->bridge.info.label);
 
-	if (!priv->bridge.customData.empty())
-	{
+	if (!priv->bridge.customData.empty()) {
 		obs_data_array_t *array = obs_data_array_create();
 
-		for (CustomData& cdata : priv->bridge.customData)
-		{
+		for (CustomData &cdata : priv->bridge.customData) {
 			obs_data_t *data = obs_data_create();
 			obs_data_set_string(data, "type", cdata.type);
 			obs_data_set_string(data, "key", cdata.key);
@@ -148,22 +148,24 @@ void carla_priv_save(struct carla_priv *priv, obs_data_t *settings)
 
 		obs_data_set_array(settings, PROP_CUSTOM_DATA, array);
 		obs_data_array_release(array);
-	}
-	else
-	{
+	} else {
 		obs_data_erase(settings, PROP_CUSTOM_DATA);
 	}
 
 	char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
 
-	if ((priv->bridge.info.options & PLUGIN_OPTION_USE_CHUNKS) && !priv->bridge.chunk.isEmpty()) {
+	if ((priv->bridge.info.options & PLUGIN_OPTION_USE_CHUNKS) &&
+	    !priv->bridge.chunk.isEmpty()) {
 		char *b64ptr = CarlaString::asBase64(priv->bridge.chunk.data(),
-						     priv->bridge.chunk.size()).releaseBufferPointer();
+						     priv->bridge.chunk.size())
+				       .releaseBufferPointer();
 		const CarlaString b64chunk(b64ptr, false);
 		obs_data_set_string(settings, PROP_CHUNK, b64chunk.buffer());
 
-		for (uint32_t i = 0; i < priv->bridge.paramCount && i < MAX_PARAMS; ++i) {
-			const carla_param_data &param(priv->bridge.paramDetails[i]);
+		for (uint32_t i = 0;
+		     i < priv->bridge.paramCount && i < MAX_PARAMS; ++i) {
+			const carla_param_data &param(
+				priv->bridge.paramDetails[i]);
 
 			if ((param.hints & PARAMETER_IS_ENABLED) == 0)
 				continue;
@@ -174,8 +176,10 @@ void carla_priv_save(struct carla_priv *priv, obs_data_t *settings)
 	} else {
 		obs_data_erase(settings, PROP_CHUNK);
 
-		for (uint32_t i = 0; i < priv->bridge.paramCount && i < MAX_PARAMS; ++i) {
-			const carla_param_data &param(priv->bridge.paramDetails[i]);
+		for (uint32_t i = 0;
+		     i < priv->bridge.paramCount && i < MAX_PARAMS; ++i) {
+			const carla_param_data &param(
+				priv->bridge.paramDetails[i]);
 
 			if ((param.hints & PARAMETER_IS_ENABLED) == 0)
 				continue;
@@ -184,12 +188,13 @@ void carla_priv_save(struct carla_priv *priv, obs_data_t *settings)
 
 			if (param.hints & PARAMETER_IS_BOOLEAN) {
 				obs_data_set_bool(settings, pname,
-						carla_isEqual(param.value,
+						  carla_isEqual(param.value,
 								param.max));
 			} else if (param.hints & PARAMETER_IS_INTEGER) {
 				obs_data_set_int(settings, pname, param.value);
 			} else {
-				obs_data_set_double(settings, pname, param.value);
+				obs_data_set_double(settings, pname,
+						    param.value);
 			}
 		}
 	}
@@ -207,19 +212,17 @@ void carla_priv_load(struct carla_priv *priv, obs_data_t *settings)
 	priv->bridge.init(priv->bufferSize, priv->sampleRate);
 
 	if (!priv->bridge.start(getBinaryTypeFromString(btype),
-				getPluginTypeFromString(ptype),
-				label, filename, uniqueId))
-	{
+				getPluginTypeFromString(ptype), label, filename,
+				uniqueId)) {
 		// TODO show error message if bridge fails
 		return;
 	}
 
-	obs_data_array_t *array = obs_data_get_array(settings, PROP_CUSTOM_DATA);
-	if (array)
-	{
+	obs_data_array_t *array =
+		obs_data_get_array(settings, PROP_CUSTOM_DATA);
+	if (array) {
 		const size_t count = obs_data_array_count(array);
-		for (size_t i = 0; i < count; ++i)
-		{
+		for (size_t i = 0; i < count; ++i) {
 			obs_data_t *data = obs_data_array_item(array, i);
 			const char *type = obs_data_get_string(data, "type");
 			const char *key = obs_data_get_string(data, "key");
@@ -230,12 +233,13 @@ void carla_priv_load(struct carla_priv *priv, obs_data_t *settings)
 	}
 
 	if (priv->bridge.info.options & PLUGIN_OPTION_USE_CHUNKS) {
-		const char *b64chunk = obs_data_get_string(settings, PROP_CHUNK);
+		const char *b64chunk =
+			obs_data_get_string(settings, PROP_CHUNK);
 		priv->bridge.load_chunk(b64chunk);
-	}
-	else {
+	} else {
 		for (uint32_t i = 0; i < priv->bridge.paramCount; ++i) {
-			const carla_param_data &param(priv->bridge.paramDetails[i]);
+			const carla_param_data &param(
+				priv->bridge.paramDetails[i]);
 
 			priv->bridge.set_value(i, param.value);
 		}
@@ -243,7 +247,8 @@ void carla_priv_load(struct carla_priv *priv, obs_data_t *settings)
 
 	char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
 
-	for (uint32_t i = 0; i < priv->bridge.paramCount && i < MAX_PARAMS; ++i) {
+	for (uint32_t i = 0; i < priv->bridge.paramCount && i < MAX_PARAMS;
+	     ++i) {
 		const carla_param_data &param(priv->bridge.paramDetails[i]);
 
 		if ((param.hints & PARAMETER_IS_ENABLED) == 0)
@@ -253,7 +258,7 @@ void carla_priv_load(struct carla_priv *priv, obs_data_t *settings)
 
 		if (param.hints & PARAMETER_IS_BOOLEAN) {
 			obs_data_set_bool(settings, pname,
-					carla_isEqual(param.value,
+					  carla_isEqual(param.value,
 							param.max));
 		} else if (param.hints & PARAMETER_IS_INTEGER) {
 			obs_data_set_int(settings, pname, param.value);
@@ -327,14 +332,14 @@ static bool carla_priv_load_file_callback(obs_properties_t *props,
 	priv->bridge.init(priv->bufferSize, priv->sampleRate);
 
 	// TODO show error message if bridge fails
-	priv->bridge.start(btype, ptype,
-			   "", filename, 0);
+	priv->bridge.start(btype, ptype, "", filename, 0);
 
 	return carla_post_load_callback(priv, props);
 }
 
 static bool carla_priv_select_plugin_callback(obs_properties_t *props,
-					      obs_property_t *property, void *data)
+					      obs_property_t *property,
+					      void *data)
 {
 	UNUSED_PARAMETER(property);
 
@@ -351,8 +356,7 @@ static bool carla_priv_select_plugin_callback(obs_properties_t *props,
 	priv->bridge.init(priv->bufferSize, priv->sampleRate);
 
 	// TODO show error message if bridge fails
-	priv->bridge.start((BinaryType)plugin->build,
-			   (PluginType)plugin->type,
+	priv->bridge.start((BinaryType)plugin->build, (PluginType)plugin->type,
 			   plugin->label, plugin->filename, plugin->uniqueId);
 
 	return carla_post_load_callback(priv, props);
@@ -450,7 +454,8 @@ void carla_priv_readd_properties(struct carla_priv *priv,
 
 	char pname[PARAM_NAME_SIZE] = PARAM_NAME_INIT;
 
-	for (uint32_t i = 0; i < priv->bridge.paramCount && i < MAX_PARAMS; ++i) {
+	for (uint32_t i = 0; i < priv->bridge.paramCount && i < MAX_PARAMS;
+	     ++i) {
 		const carla_param_data &param(priv->bridge.paramDetails[i]);
 
 		if ((param.hints & PARAMETER_IS_ENABLED) == 0)

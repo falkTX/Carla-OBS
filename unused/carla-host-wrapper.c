@@ -70,11 +70,9 @@ struct carla_priv *carla_priv_create(obs_source_t *source,
 		goto fail1;
 
 	// TODO build and setup local bridges
-	carla_set_engine_option(priv->handle,
-				ENGINE_OPTION_PATH_BINARIES, 0,
+	carla_set_engine_option(priv->handle, ENGINE_OPTION_PATH_BINARIES, 0,
 				"/usr/lib/carla");
-	carla_set_engine_option(priv->handle,
-				ENGINE_OPTION_PATH_RESOURCES, 0,
+	carla_set_engine_option(priv->handle, ENGINE_OPTION_PATH_RESOURCES, 0,
 				"/usr/share/carla/resources");
 	carla_set_engine_option(priv->handle,
 				ENGINE_OPTION_PREFER_PLUGIN_BRIDGES, 1, NULL);
@@ -114,13 +112,13 @@ void carla_priv_deactivate(struct carla_priv *priv)
 	carla_set_active(priv->handle, 0, false);
 }
 
-void carla_priv_process_audio(struct carla_priv *priv, float *buffers[MAX_AV_PLANES],
-			      uint32_t frames)
+void carla_priv_process_audio(struct carla_priv *priv,
+			      float *buffers[MAX_AV_PLANES], uint32_t frames)
 {
 	// TODO process
-// 	priv->timeInfo.usecs = os_gettime_ns() / 1000;
-// 	priv->descriptor->process(priv->handle, buffers, buffers, frames, NULL,
-// 				  0);
+	// 	priv->timeInfo.usecs = os_gettime_ns() / 1000;
+	// 	priv->descriptor->process(priv->handle, buffers, buffers, frames, NULL,
+	// 				  0);
 }
 
 void carla_priv_idle(struct carla_priv *priv)
@@ -156,9 +154,9 @@ void carla_priv_set_buffer_size(struct carla_priv *priv,
 
 	priv->bufferSize = new_buffer_size;
 	// TODO set buffer size
-// 	priv->descriptor->dispatcher(priv->handle,
-// 				     NATIVE_PLUGIN_OPCODE_BUFFER_SIZE_CHANGED,
-// 				     new_buffer_size, 0, NULL, 0.f);
+	// 	priv->descriptor->dispatcher(priv->handle,
+	// 				     NATIVE_PLUGIN_OPCODE_BUFFER_SIZE_CHANGED,
+	// 				     new_buffer_size, 0, NULL, 0.f);
 
 	if (activated)
 		carla_priv_activate(priv);
@@ -228,7 +226,8 @@ void carla_priv_readd_properties(struct carla_priv *priv,
 	obs_data_t *settings = obs_source_get_settings(priv->source);
 
 	// show/hide GUI button
-	if (carla_get_plugin_info(priv->handle, 0)->hints & PLUGIN_HAS_CUSTOM_UI) {
+	if (carla_get_plugin_info(priv->handle, 0)->hints &
+	    PLUGIN_HAS_CUSTOM_UI) {
 		obs_properties_add_button2(props, PROP_SHOW_GUI,
 					   obs_module_text("Show custom GUI"),
 					   carla_priv_show_gui_callback, priv);
@@ -271,27 +270,23 @@ void carla_priv_readd_properties(struct carla_priv *priv,
 						       info->name);
 
 			obs_data_set_default_bool(settings, pname,
-						  ranges->def ==
-							  ranges->max);
+						  ranges->def == ranges->max);
 
 			if (reset)
 				obs_data_set_bool(settings, pname,
-						  ranges->def ==
-							  ranges->max);
+						  ranges->def == ranges->max);
 		} else if (data->hints & PARAMETER_IS_INTEGER) {
 			prop = obs_properties_add_int_slider(
 				props, pname, info->name, ranges->min,
 				ranges->max, ranges->step);
 
-			obs_data_set_default_int(settings, pname,
-						 ranges->def);
+			obs_data_set_default_int(settings, pname, ranges->def);
 
 			if (info->unit && *info->unit)
 				obs_property_int_set_suffix(prop, info->unit);
 
 			if (reset)
-				obs_data_set_int(settings, pname,
-						 ranges->def);
+				obs_data_set_int(settings, pname, ranges->def);
 		} else {
 			prop = obs_properties_add_float_slider(
 				props, pname, info->name, ranges->min,
@@ -367,10 +362,9 @@ bool carla_priv_select_plugin_callback(obs_properties_t *props,
 	if (carla_get_current_plugin_count(priv->handle) != 0)
 		carla_replace_plugin(priv->handle, 0);
 
-	if (carla_add_plugin(priv->handle, plugin->build,
-			     plugin->type, plugin->filename, plugin->name,
-			     plugin->label, plugin->uniqueId, NULL,
-			     PLUGIN_OPTIONS_NULL))
+	if (carla_add_plugin(priv->handle, plugin->build, plugin->type,
+			     plugin->filename, plugin->name, plugin->label,
+			     plugin->uniqueId, NULL, PLUGIN_OPTIONS_NULL))
 		return carla_post_load_callback(priv, props);
 
 	return false;
@@ -387,12 +381,11 @@ bool carla_priv_show_gui_callback(obs_properties_t *props,
 	char winIdStr[24];
 	snprintf(winIdStr, sizeof(winIdStr), "%llx",
 		 (ulonglong)carla_qt_get_main_window_id());
-	carla_set_engine_option(priv->handle,
-				ENGINE_OPTION_FRONTEND_WIN_ID, 0, winIdStr);
+	carla_set_engine_option(priv->handle, ENGINE_OPTION_FRONTEND_WIN_ID, 0,
+				winIdStr);
 
 	const double scaleFactor = carla_qt_get_scale_factor();
-	carla_set_engine_option(priv->handle,
-				ENGINE_OPTION_FRONTEND_UI_SCALE,
+	carla_set_engine_option(priv->handle, ENGINE_OPTION_FRONTEND_UI_SCALE,
 				scaleFactor * 1000, NULL);
 
 	carla_show_custom_ui(priv->handle, 0, true);
