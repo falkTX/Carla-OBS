@@ -358,7 +358,7 @@ bool carla_bridge::start(const BinaryType btype, const PluginType ptype,
 			// TODO we need to hook into qprocess for:
 			// posix_spawnattr_setbinpref_np + CPU_TYPE_ARM64 | CPU_TYPE_X86_64
 			arguments.append("-arch");
-			arguments.append(needsArchBridge);
+			arguments.append("x86_64");
 			arguments.append(bridgeBinary);
 			bridgeBinary = "arch";
 		}
