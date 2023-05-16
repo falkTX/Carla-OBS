@@ -58,7 +58,7 @@ void carla_priv_idle(struct carla_priv *carla);
 void carla_priv_save(struct carla_priv *carla, obs_data_t *settings);
 void carla_priv_load(struct carla_priv *carla, obs_data_t *settings);
 
-void carla_priv_set_buffer_size(struct carla_priv *priv,
+void carla_priv_set_buffer_size(struct carla_priv *carla,
 				enum buffer_size_mode bufsize);
 
 void carla_priv_readd_properties(struct carla_priv *carla,

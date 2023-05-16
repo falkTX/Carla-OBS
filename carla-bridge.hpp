@@ -138,7 +138,7 @@ struct carla_bridge {
 	void show_ui();
 
 	// [de]activate, a deactivated plugin does not process any audio
-	// bool is_active() const noexcept;
+	bool is_active() const noexcept;
 	void activate();
 	void deactivate();
 
@@ -170,6 +170,10 @@ struct carla_bridge {
 	// request plugin bridge to save and report back its internal state
 	// must be called just before saving plugin state
 	void save_and_wait();
+
+	// change the maximum expected buffer size
+	// plugin is temporarily deactivated during the change
+	void set_buffer_size(uint32_t maxBufferSize);
 
 private:
 	bool activated = false;

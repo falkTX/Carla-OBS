@@ -200,11 +200,63 @@ static void carla_obs_destroy(void *data)
 	bfree(carla);
 }
 
+static bool carla_obs_bufsize_callback(void *data, obs_properties_t *props,
+				        obs_property_t *list, obs_data_t *settings)
+{
+	UNUSED_PARAMETER(props);
+	UNUSED_PARAMETER(list);
+
+	struct carla_data *carla = data;
+
+	enum buffer_size_mode bufsize;
+	const char *const value = obs_data_get_string(settings, PROP_BUFFER_SIZE);
+
+	/**/ if (!strcmp(value, "direct"))
+		bufsize = buffer_size_direct;
+	else if (!strcmp(value, "128"))
+		bufsize = buffer_size_buffered_128;
+	else if (!strcmp(value, "256"))
+		bufsize = buffer_size_buffered_256;
+	else if (!strcmp(value, "512"))
+		bufsize = buffer_size_buffered_512;
+	else
+		return false;
+
+	if (carla->buffer_size_mode == bufsize)
+		return false;
+
+	blog(LOG_INFO,
+	     "[" CARLA_MODULE_ID "] changing buffer size to %s", value);
+
+	// deactivate first, to stop audio from processing
+	carla_priv_deactivate(carla->priv);
+
+	// safely change to new buffer size
+	carla->buffer_size_mode = bufsize;
+	carla_priv_set_buffer_size(carla->priv, bufsize);
+
+	// activate again
+	carla_priv_activate(carla->priv);
+
+	return false;
+}
+
 static obs_properties_t *carla_obs_get_properties(void *data)
 {
 	struct carla_data *carla = data;
 
 	obs_properties_t *props = obs_properties_create();
+
+	obs_property_t *list = obs_properties_add_list(props, PROP_BUFFER_SIZE,
+					obs_module_text("Buffer Size"),
+					OBS_COMBO_TYPE_LIST,
+					OBS_COMBO_FORMAT_STRING);
+
+	obs_property_list_add_string(list, obs_module_text("Direct"), "direct");
+	obs_property_list_add_string(list, obs_module_text("128 samples (buffered)"), "128");
+	obs_property_list_add_string(list, obs_module_text("256 samples (buffered)"), "256");
+	obs_property_list_add_string(list, obs_module_text("512 samples (buffered)"), "512");
+	obs_property_set_modified_callback2(list, carla_obs_bufsize_callback, carla);
 
 	carla_priv_readd_properties(carla->priv, props, false);
 

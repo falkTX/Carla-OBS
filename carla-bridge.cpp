@@ -551,10 +551,10 @@ void carla_bridge::show_ui()
 	}
 }
 
-// bool carla_bridge::is_active() const noexcept
-// {
-// 	return activated;
-// }
+bool carla_bridge::is_active() const noexcept
+{
+	return activated;
+}
 
 void carla_bridge::activate()
 {
@@ -976,8 +976,27 @@ void carla_bridge::save_and_wait()
 	}
 }
 
-// ----------------------------------------------------------------------------
+void carla_bridge::set_buffer_size(const uint32_t maxBufferSize)
+{
+	if (bufferSize == maxBufferSize)
+		return;
 
+	bufferSize = maxBufferSize;
+
+	if (is_running()) {
+		audiopool.resize(maxBufferSize, MAX_AV_PLANES, MAX_AV_PLANES);
+
+		rtClientCtrl.writeOpcode(kPluginBridgeRtClientSetAudioPool);
+		rtClientCtrl.writeULong(static_cast<uint64_t>(audiopool.dataSize));
+		rtClientCtrl.commitWrite();
+
+		rtClientCtrl.writeOpcode(kPluginBridgeRtClientSetBufferSize);
+		rtClientCtrl.writeUInt(maxBufferSize);
+		rtClientCtrl.commitWrite();
+	}
+}
+
+// ----------------------------------------------------------------------------
 void carla_bridge::readMessages()
 {
 	while (nonRtServerCtrl.isDataAvailableForReading()) {

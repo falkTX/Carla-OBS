@@ -270,9 +270,7 @@ void carla_priv_load(struct carla_priv *priv, obs_data_t *settings)
 void carla_priv_set_buffer_size(struct carla_priv *priv,
 				enum buffer_size_mode bufsize)
 {
-	// TODO
-	UNUSED_PARAMETER(priv);
-	UNUSED_PARAMETER(bufsize);
+	priv->bridge.set_buffer_size(bufsize_mode_to_frames(bufsize));
 }
 
 // ----------------------------------------------------------------------------
@@ -473,7 +471,6 @@ void carla_priv_readd_properties(struct carla_priv *priv,
 				 obs_properties_t *props, bool reset)
 {
 	if (!reset) {
-		// first init, add unremovable buttons
 		obs_properties_add_button2(props, PROP_SELECT_PLUGIN,
 					   obs_module_text("Select plugin..."),
 					   carla_priv_select_plugin_callback,
